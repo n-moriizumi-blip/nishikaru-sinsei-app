@@ -82,6 +82,18 @@
     font-weight: 600;
     margin: 12px 0;
   }
+  /* 早退・午後休・遅刻中抜け＋早退の当日申請への注意書き：目立つ赤系配色（他の警告表示と同じ色） */
+  .today-warning-banner {
+    background: #FCE4D6;
+    color: #7F0000;
+    border: 2px solid #E8A9A9;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14.5px;
+    font-weight: 700;
+    text-align: center;
+    margin: 16px 0 4px;
+  }
   input[type="date"]:disabled, input[type="time"]:disabled {
     background: #EDF0F3;
     color: #8A93A0;
@@ -621,6 +633,7 @@
     <textarea id="yukyuRiyu"></textarea>
   </div>
 
+  <p class="today-warning-banner hidden" id="yukyuTodayWarning">⚠️ 社長か総務に一言声をかけてから早退してください</p>
   <button class="primary-btn" id="yukyuSubmitBtn">送信</button>
   <button class="secondary-btn hidden" id="yukyuCancelEditBtn">編集をやめて新規作成に戻る</button>
   <div class="message" id="yukyuMessage"></div>
@@ -1286,6 +1299,19 @@
   }
   const YUKYU_GROUP_KBN = ['通常有給', '欠勤控除', '欠勤控除（労災）'];
   const YUKYU_TIME_TYPES = ['遅刻', '早退', '中抜け', '遅刻・中抜け＋早退'];
+  // 2026-08-23新設：早退・午後休・遅刻中抜け＋早退の対象日が「当日」のときだけ、
+  // 送信前に一声かけてもらうための注意書きを表示する対象の申請種別
+  const TODAY_WARNING_SHINSEI = ['早退', '午後休（0.5日）', '遅刻・中抜け＋早退'];
+  function todayDateStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function updateYukyuTodayWarning() {
+    const b = yukyuBranch();
+    const dateVal = document.getElementById('yukyuSingleDate').value;
+    const show = TODAY_WARNING_SHINSEI.includes(b.shinsei) && dateVal === todayDateStr();
+    document.getElementById('yukyuTodayWarning').classList.toggle('hidden', !show);
+  }
 
   function yukyuBranch() {
     const kbn     = getRadioValue('yukyuKbn');
@@ -1338,6 +1364,7 @@
     document.getElementById('yukyuShoubyouArea').classList.toggle('hidden', !b.isShoubyou);
 
     document.getElementById('yukyuRiyuArea').classList.toggle('hidden', b.isTokubetsu);
+    updateYukyuTodayWarning();
   }
 
   // 事後申請の時刻欄は、既定では触れなくてよいようにしておく（実際の打刻時刻をそのまま
@@ -1381,7 +1408,7 @@
   document.querySelectorAll('input[name="yukyuJizenGo"], input[name="yukyuKbn"], input[name="yukyuShinsei"]').forEach((r) => {
     r.addEventListener('change', () => { updateYukyuFieldVisibility(); fetchYukyuActualTimes(); });
   });
-  document.getElementById('yukyuSingleDate').addEventListener('change', fetchYukyuActualTimes);
+  document.getElementById('yukyuSingleDate').addEventListener('change', () => { fetchYukyuActualTimes(); updateYukyuTodayWarning(); });
   ['yukyuShukkinYotei', 'yukyuTaikinYotei', 'yukyuGaishutsuYotei', 'yukyuKishaYotei',
    'yukyuW1s', 'yukyuW1e', 'yukyuW2s', 'yukyuW2e'].forEach((id) => {
     document.getElementById(id).addEventListener('input', updateYukyuDurationPreview);
