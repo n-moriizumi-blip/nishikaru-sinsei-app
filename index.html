@@ -469,6 +469,26 @@
     <p class="hint" style="margin-top:-2px;">※空欄の場合は定時通りとみなします。</p>
   </div>
 
+  <div id="chokkouHiruKyukeiArea" class="hidden">
+    <label>昼休憩（45分間）を取りますか？</label>
+    <p class="hint" style="margin-top:-2px;">※実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
+    <div class="radio-group row" id="chokkouHiruKyukeiGroup">
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukei" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukei" value="いいえ"> いいえ</label>
+    </div>
+  </div>
+
+  <div id="chokkouGogoKyukeiArea" class="hidden">
+    <label>午後休憩（15分間）を取りますか？</label>
+    <p class="hint" style="margin-top:-2px;">※実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
+    <div class="radio-group row" id="chokkouGogoKyukeiGroup">
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukei" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukei" value="いいえ"> いいえ</label>
+    </div>
+  </div>
+
+  <p class="duration-preview hidden" id="chokkouDurationPreview"></p>
+
   <label for="chokkouRiyu">現場名・理由</label>
   <textarea id="chokkouRiyu" placeholder="例：〇〇社△△現場、機械据付のため"></textarea>
 
@@ -1124,6 +1144,12 @@
     if (!taishouDate || !startTime || !endTime || !riyu) {
       messageEl.className = 'message err'; messageEl.textContent = '未入力の項目があります。'; return;
     }
+    // 2026-09-20追加：休日出勤扱いの日は労基法の休憩基準（実働6時間で45分、8時間で60分）を
+    // 守れているか確認する必要があるため、昼休憩・午後休憩の質問が表示されている場合は必須にする
+    const isHolidayWork = !document.getElementById('hiruKyukeiArea').classList.contains('hidden');
+    if (isHolidayWork && (!hiruKyukei || !gogoKyukei)) {
+      messageEl.className = 'message err'; messageEl.textContent = '休日出勤のため、昼休憩・午後休憩の質問に回答してください。'; return;
+    }
 
     const btn = document.getElementById('zangyouSubmitBtn');
     const isEditing = !!zangyouEditingAppId;
@@ -1170,6 +1196,63 @@
     r.addEventListener('change', updateChokkouFieldVisibility);
   });
 
+  // 2026-09-20新設：残業申請のupdateZangyouKyukeiVisibilityと同じ考え方。開始日〜終了日の
+  // 範囲内にどこか休日出勤扱いの日が1日でもあれば、昼休憩・午後休憩の質問を表示する
+  // （出張届は複数日にまたがるためendDateも渡してGAS側〈mode=checkWorkday〉で判定する）
+  function updateChokkouKyukeiVisibility() {
+    const startVal = document.getElementById('chokkouStartDate').value;
+    const endVal   = document.getElementById('chokkouEndDate').value || startVal;
+    const hiruArea = document.getElementById('chokkouHiruKyukeiArea');
+    const gogoArea = document.getElementById('chokkouGogoKyukeiArea');
+    if (!startVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); return; }
+    const startStr = startVal.replace(/-/g, '/');
+    const endStr   = endVal.replace(/-/g, '/');
+    fetch(GAS_URL + '?mode=checkWorkday&token=' + encodeURIComponent(idToken) +
+      '&date=' + encodeURIComponent(startStr) + '&endDate=' + encodeURIComponent(endStr))
+      .then((r) => r.json())
+      .then((data) => {
+        const isHolidayWork = data.success && data.hasHoliday === true;
+        hiruArea.classList.toggle('hidden', !isHolidayWork);
+        gogoArea.classList.toggle('hidden', !isHolidayWork);
+        if (!isHolidayWork) { setRadioValue('chokkouHiruKyukei', ''); setRadioValue('chokkouGogoKyukei', ''); }
+        updateChokkouDurationPreview();
+      })
+      .catch(() => {});
+  }
+  document.getElementById('chokkouStartDate').addEventListener('change', updateChokkouKyukeiVisibility);
+  document.getElementById('chokkouEndDate').addEventListener('change', updateChokkouKyukeiVisibility);
+
+  // 残業申請のupdateZangyouDurationPreviewと同じ考え方。出勤・退勤予定時刻が両方入力されている
+  // 場合だけ、実働の目安と労基法の休憩基準（実働6時間で45分、8時間で60分）の注意を表示する
+  // （片方でも空欄＝定時通りの場合は、定時が分からないためプレビューは出さない）
+  function updateChokkouDurationPreview() {
+    const el = document.getElementById('chokkouDurationPreview');
+    const isHolidayWork = !document.getElementById('chokkouHiruKyukeiArea').classList.contains('hidden');
+    const start = document.getElementById('chokkouShukkinTime').value;
+    const end   = document.getElementById('chokkouTaikinTime').value;
+    if (!isHolidayWork || !start || !end) { el.classList.add('hidden'); return; }
+    let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start);
+    if (rawSpan <= 0) rawSpan += 24 * 60;
+    const hiruYes = getRadioValue('chokkouHiruKyukei') === 'はい';
+    const gogoYes = getRadioValue('chokkouGogoKyukei') === 'はい';
+    const kyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
+    let html = '';
+    if (rawSpan >= 8 * 60 && kyukeiMin < 60) {
+      html = '⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。';
+    } else if (rawSpan >= 6 * 60 && kyukeiMin < 45) {
+      html = '⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。';
+    }
+    if (!html) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.innerHTML = '<span style="color:#B00020;">' + html + '</span>';
+  }
+  ['chokkouShukkinTime', 'chokkouTaikinTime'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', updateChokkouDurationPreview);
+  });
+  document.querySelectorAll('input[name="chokkouHiruKyukei"], input[name="chokkouGogoKyukei"]').forEach((r) => {
+    r.addEventListener('change', updateChokkouDurationPreview);
+  });
+
   function loadChokkouChokkiRequests() {
     const listEl = document.getElementById('chokkouChokkiRequestsList');
     listEl.textContent = '読み込み中...';
@@ -1210,7 +1293,10 @@
     document.getElementById('chokkouShukkinTime').value = req.shukkinTime || '';
     document.getElementById('chokkouTaikinTime').value = req.taikinTime || '';
     document.getElementById('chokkouRiyu').value = req.riyu;
+    setRadioValue('chokkouHiruKyukei', req.hiruKyukei || '');
+    setRadioValue('chokkouGogoKyukei', req.gogoKyukei || '');
     updateChokkouFieldVisibility();
+    updateChokkouKyukeiVisibility();
     document.getElementById('chokkouChokkiEditingNotice').style.display = 'block';
     document.getElementById('chokkouChokkiEditingNotice').textContent = '申請ID「' + req.appId + '」を編集中です。';
     document.getElementById('chokkouCancelEditBtn').classList.remove('hidden');
@@ -1226,7 +1312,10 @@
     document.getElementById('chokkouShukkinTime').value = '';
     document.getElementById('chokkouTaikinTime').value = '';
     document.getElementById('chokkouRiyu').value = '';
+    setRadioValue('chokkouHiruKyukei', '');
+    setRadioValue('chokkouGogoKyukei', '');
     updateChokkouFieldVisibility();
+    updateChokkouKyukeiVisibility();
     document.getElementById('chokkouChokkiEditingNotice').style.display = 'none';
     document.getElementById('chokkouCancelEditBtn').classList.add('hidden');
     document.getElementById('chokkouSubmitBtn').textContent = '送信';
@@ -1240,6 +1329,8 @@
     const endDate    = document.getElementById('chokkouEndDate').value ? document.getElementById('chokkouEndDate').value.replace(/-/g, '/') : '';
     const shukkinTime= document.getElementById('chokkouShukkinTime').value;
     const taikinTime = document.getElementById('chokkouTaikinTime').value;
+    const hiruKyukei = getRadioValue('chokkouHiruKyukei');
+    const gogoKyukei = getRadioValue('chokkouGogoKyukei');
     const riyu       = document.getElementById('chokkouRiyu').value.trim();
     const messageEl  = document.getElementById('chokkouMessage');
     messageEl.className = 'message'; messageEl.textContent = '';
@@ -1247,14 +1338,20 @@
     if (!shinsei || !startDate || !endDate || !riyu) {
       messageEl.className = 'message err'; messageEl.textContent = '未入力の項目があります。'; return;
     }
+    // 2026-09-20追加：休日出勤扱いの期間は労基法の休憩基準（実働6時間で45分、8時間で60分）を
+    // 守れているか確認する必要があるため、昼休憩・午後休憩の質問が表示されている場合は必須にする
+    const isHolidayWork = !document.getElementById('chokkouHiruKyukeiArea').classList.contains('hidden');
+    if (isHolidayWork && (!hiruKyukei || !gogoKyukei)) {
+      messageEl.className = 'message err'; messageEl.textContent = '休日出勤にあたるため、昼休憩・午後休憩の質問に回答してください。'; return;
+    }
 
     const btn = document.getElementById('chokkouSubmitBtn');
     const isEditing = !!chokkouChokkiEditingAppId;
     btn.disabled = true; btn.textContent = isEditing ? '更新中...' : '送信中...';
 
     const payload = isEditing
-      ? { action: 'updateChokkouChokki', token: idToken, appId: chokkouChokkiEditingAppId, shinsei, startDate, endDate, shukkinTime, taikinTime, riyu }
-      : { action: 'submitChokkouChokki', token: idToken, shinsei, startDate, endDate, shukkinTime, taikinTime, riyu, dairiEmail };
+      ? { action: 'updateChokkouChokki', token: idToken, appId: chokkouChokkiEditingAppId, shinsei, startDate, endDate, shukkinTime, taikinTime, hiruKyukei, gogoKyukei, riyu }
+      : { action: 'submitChokkouChokki', token: idToken, shinsei, startDate, endDate, shukkinTime, taikinTime, hiruKyukei, gogoKyukei, riyu, dairiEmail };
 
     fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then((r) => r.json())
