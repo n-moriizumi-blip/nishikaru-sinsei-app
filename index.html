@@ -295,7 +295,7 @@
     </button>
     <label>申請する</label>
     <button class="type-choice" onclick="showSection('yukyu')">
-      有休・遅刻・早退申請
+      有給・遅刻・早退申請
       <span class="desc">有給休暇・欠勤・特別休暇・遅刻・早退・中抜けを申請します</span>
     </button>
     <button class="type-choice" onclick="showSection('zangyou')">
@@ -505,11 +505,11 @@
   </div>
 </div>
 
-<!-- ── 有休・遅刻・早退申請 ── -->
+<!-- ── 有給・遅刻・早退申請 ── -->
 <div class="card hidden" id="yukyuCard">
   <div class="card-header">
     <span class="back-link" onclick="showSection('select')">← 種類を選び直す</span>
-    <h1>有休・遅刻・早退申請</h1>
+    <h1>有給・遅刻・早退申請</h1>
     <p class="sub">有給休暇・欠勤控除・特別休暇・遅刻・早退・中抜けの申請フォームです。</p>
   </div>
   <div class="card-body">
@@ -662,7 +662,7 @@
 
 <div class="card hidden" id="yukyuRequestsCard">
   <div class="card-body">
-    <h2>自分の有休・遅刻・早退申請の一覧</h2>
+    <h2>自分の有給・遅刻・早退申請の一覧</h2>
     <div id="yukyuRequestsList"></div>
   </div>
 </div>
@@ -1374,7 +1374,7 @@
   });
 
   // ============================================================
-  // 有休・遅刻・早退申請
+  // 有給・遅刻・早退申請
   // ============================================================
   let yukyuEditingAppId = null;
   let myTeijiStart = '';
@@ -1895,7 +1895,7 @@
     }
 
     html += '<label>承認待ちの申請</label>';
-    html += pendingRow('有休・遅刻・早退申請', data.pending.yukyu, 'yukyu');
+    html += pendingRow('有給・遅刻・早退申請', data.pending.yukyu, 'yukyu');
     html += pendingRow('残業申請', data.pending.zangyou, 'zangyou');
     html += pendingRow('打刻修正依頼', data.pending.shuusei, 'shuusei');
     html += pendingRow('出張申請', data.pending.chokkouChokki, 'chokkouChokki');
