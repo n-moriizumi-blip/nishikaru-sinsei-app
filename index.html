@@ -369,7 +369,11 @@
     <h1>打刻履歴</h1>
     <p class="sub">出勤・退勤の記録を確認できます（閲覧専用）。</p>
   </div>
-  <div class="card-body" id="dakokuHistoryBody">読み込み中...</div>
+  <div class="card-body">
+    <label style="margin-top:0;">対象期間</label>
+    <select id="dakokuHistoryPeriod" onchange="loadDakokuHistory()"></select>
+    <div id="dakokuHistoryBody" style="margin-top:18px;">読み込み中...</div>
+  </div>
 </div>
 
 <!-- ── 打刻修正依頼 ── -->
@@ -1963,12 +1967,41 @@
   }
 
   // ============================================================
-  // 打刻履歴（2026-10-03新設）
+  // 打刻履歴（2026-10-03新設、2026-10-03に期間選択を追加）
   // ============================================================
+  // 対象期間の選択肢を生成する（今期間＋過去24期間分）。サーバーに一覧を問い合わせず、
+  // mode=myDakokuLogと同じ「21日区切り」の考え方でJS側だけで計算する
+  function populateDakokuHistoryPeriods() {
+    const sel = document.getElementById('dakokuHistoryPeriod');
+    if (sel.options.length > 0) return; // 初回のみ生成（画面を開き直しても選択中の期間を保つ）
+    const now = new Date();
+    let start = now.getDate() <= 20
+      ? new Date(now.getFullYear(), now.getMonth() - 1, 21)
+      : new Date(now.getFullYear(), now.getMonth(), 21);
+    for (let i = 0; i < 25; i++) {
+      const periodEnd = new Date(start.getFullYear(), start.getMonth() + 1, 20);
+      const isCurrent = i === 0;
+      const displayEnd = isCurrent ? now : periodEnd;
+      const yy = String(periodEnd.getFullYear()).slice(-2);
+      const mm = String(periodEnd.getMonth() + 1).padStart(2, '0');
+      const label = yy + '.' + mm;
+      const opt = document.createElement('option');
+      opt.value = isCurrent ? '' : label; // 今期間はperiodパラメータを省略する（サーバー側のデフォルト動作）
+      opt.textContent = label + '（' + (start.getMonth() + 1) + '/' + start.getDate() + '〜' +
+        (displayEnd.getMonth() + 1) + '/' + displayEnd.getDate() + '）' + (isCurrent ? '・今期間' : '');
+      sel.appendChild(opt);
+      start = new Date(start.getFullYear(), start.getMonth() - 1, 21);
+    }
+  }
+
   function loadDakokuHistory() {
+    populateDakokuHistoryPeriods();
+    const period = document.getElementById('dakokuHistoryPeriod').value;
     const bodyEl = document.getElementById('dakokuHistoryBody');
     bodyEl.textContent = '読み込み中...';
-    fetch(GAS_URL + '?mode=myDakokuLog&token=' + encodeURIComponent(idToken))
+    const url = GAS_URL + '?mode=myDakokuLog&token=' + encodeURIComponent(idToken) +
+      (period ? '&period=' + encodeURIComponent(period) : '');
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (!data.success) { bodyEl.textContent = '取得できませんでした：' + data.error; return; }
@@ -1979,10 +2012,10 @@
 
   function renderDakokuHistory(list) {
     const bodyEl = document.getElementById('dakokuHistoryBody');
-    if (list.length === 0) { bodyEl.innerHTML = '<p style="color:#5C6670;">今期間の打刻はまだありません。</p>'; return; }
+    if (list.length === 0) { bodyEl.innerHTML = '<p style="color:#5C6670;">この期間の打刻はありません。</p>'; return; }
 
     const DOW_JP = ['日', '月', '火', '水', '木', '金', '土'];
-    let html = '<label style="margin-top:0;">今期間の打刻</label><div class="dakoku-list">';
+    let html = '<div class="dakoku-list">';
     // 古い日付→新しい日付の順（APIが返す順のまま、並び替えしない）
     list.forEach((d) => {
       const dt = new Date(d.dateStr.replace(/\//g, '-'));
