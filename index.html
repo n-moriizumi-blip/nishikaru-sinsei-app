@@ -221,6 +221,45 @@
     font-size: 12.5px;
     margin: 0 0 16px;
   }
+  /* ── 打刻履歴（2026-10-03新設） ── */
+  .dakoku-list { display: flex; flex-direction: column; gap: 8px; }
+  .dakoku-row {
+    border: 1px solid #E2E6EA;
+    border-radius: 12px;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .dakoku-row.flagged { border-color: #E8A9A9; background: #FFFAF8; }
+  .dakoku-date { width: 60px; flex: 0 0 auto; }
+  .dakoku-date .d { font-size: 15px; font-weight: 700; color: #1F3A52; line-height: 1.2; }
+  .dakoku-date .dow { font-size: 11px; color: #5C6670; }
+  .dakoku-date .dow.holiday { color: #B00020; font-weight: 700; }
+  .dakoku-times { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.5; }
+  .dakoku-times .seg { display: inline-flex; align-items: baseline; gap: 4px; margin-right: 14px; }
+  .dakoku-times .seg .lbl { font-size: 11px; color: #5C6670; }
+  .dakoku-times .seg .val { font-weight: 700; color: #1D2226; font-variant-numeric: tabular-nums; }
+  .dakoku-times .seg .val.missing { color: #B00020; }
+  .dakoku-note {
+    display: block;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: #7F0000;
+    background: #FCE4D6;
+    padding: 1px 8px;
+    border-radius: 999px;
+  }
+  .dakoku-note .fix-link { text-decoration: underline; cursor: pointer; margin-left: 6px; }
+  .tag-holiday {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #1F3A52;
+    background: #EDE6D6;
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 4px;
+  }
   .duration-preview {
     background: #E4EAF0;
     color: #1F3A52;
@@ -321,6 +360,16 @@
     <p class="sub">有給残日数・残業状況・承認待ちの申請を確認できます（閲覧専用）。</p>
   </div>
   <div class="card-body" id="myInfoBody">読み込み中...</div>
+</div>
+
+<!-- ── 打刻履歴（2026-10-03新設） ── -->
+<div class="card hidden" id="dakokuHistoryCard">
+  <div class="card-header">
+    <span class="back-link" onclick="showSection('myInfo')">← マイページへ戻る</span>
+    <h1>打刻履歴</h1>
+    <p class="sub">出勤・退勤の記録を確認できます（閲覧専用）。</p>
+  </div>
+  <div class="card-body" id="dakokuHistoryBody">読み込み中...</div>
 </div>
 
 <!-- ── 打刻修正依頼 ── -->
@@ -806,7 +855,8 @@
   // ── セクション切り替え ──
   function showSection(name) {
     ['typeSelectCard', 'shuuseiCard', 'shuuseiRequestsCard', 'zangyouCard', 'zangyouRequestsCard',
-     'chokkouChokkiCard', 'chokkouChokkiRequestsCard', 'yukyuCard', 'yukyuRequestsCard', 'myInfoCard'].forEach((id) => {
+     'chokkouChokkiCard', 'chokkouChokkiRequestsCard', 'yukyuCard', 'yukyuRequestsCard', 'myInfoCard',
+     'dakokuHistoryCard'].forEach((id) => {
       document.getElementById(id).classList.add('hidden');
     });
     if (name === 'select') {
@@ -830,6 +880,9 @@
     } else if (name === 'myInfo') {
       document.getElementById('myInfoCard').classList.remove('hidden');
       loadMyInfo();
+    } else if (name === 'dakokuHistory') {
+      document.getElementById('dakokuHistoryCard').classList.remove('hidden');
+      loadDakokuHistory();
     }
     window.scrollTo({ top: 0 });
   }
@@ -1876,6 +1929,12 @@
         '</div>';
     }
 
+    html += '<label>打刻を確認する</label>';
+    html += '<div class="req-item clickable" onclick="showSection(\'dakokuHistory\')" style="display:flex;align-items:center;justify-content:space-between;">' +
+      '<div><strong>📋 打刻履歴（今期間）</strong>' +
+      '<div style="color:#5C6670;font-size:12px;margin-top:2px;">出勤・退勤を確認できます</div></div>' +
+      '<span style="color:#1F3A52;font-size:18px;">›</span></div>';
+
     if (data.zangyou36) {
       html += '<label>残業・36協定（今年度）</label>';
       html += '<div class="info-grid">' +
@@ -1900,6 +1959,54 @@
     html += pendingRow('打刻修正依頼', data.pending.shuusei, 'shuusei');
     html += pendingRow('出張申請', data.pending.chokkouChokki, 'chokkouChokki');
 
+    bodyEl.innerHTML = html;
+  }
+
+  // ============================================================
+  // 打刻履歴（2026-10-03新設）
+  // ============================================================
+  function loadDakokuHistory() {
+    const bodyEl = document.getElementById('dakokuHistoryBody');
+    bodyEl.textContent = '読み込み中...';
+    fetch(GAS_URL + '?mode=myDakokuLog&token=' + encodeURIComponent(idToken))
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) { bodyEl.textContent = '取得できませんでした：' + data.error; return; }
+        renderDakokuHistory(data.list);
+      })
+      .catch(() => { bodyEl.textContent = '取得中にエラーが発生しました。'; });
+  }
+
+  function renderDakokuHistory(list) {
+    const bodyEl = document.getElementById('dakokuHistoryBody');
+    if (list.length === 0) { bodyEl.innerHTML = '<p style="color:#5C6670;">今期間の打刻はまだありません。</p>'; return; }
+
+    const DOW_JP = ['日', '月', '火', '水', '木', '金', '土'];
+    let html = '<label style="margin-top:0;">今期間の打刻</label><div class="dakoku-list">';
+    // 古い日付→新しい日付の順（APIが返す順のまま、並び替えしない）
+    list.forEach((d) => {
+      const dt = new Date(d.dateStr.replace(/\//g, '-'));
+      const mmdd = (dt.getMonth() + 1) + '/' + dt.getDate();
+      const dowClass = d.isHoliday ? 'dow holiday' : 'dow';
+
+      let segs = '<span class="seg"><span class="lbl">出勤</span><span class="val">' + (d.shukkin || '未打刻') + '</span></span>';
+      d.gaishutsu.forEach((g) => {
+        segs += '<span class="seg"><span class="lbl">外出</span><span class="val">' + g.start + '</span></span>';
+        segs += '<span class="seg"><span class="lbl">帰社</span><span class="val">' + g.end + '</span></span>';
+      });
+      const taikinClass = d.taikinMissing ? 'val missing' : 'val';
+      segs += '<span class="seg"><span class="lbl">退勤</span><span class="' + taikinClass + '">' + (d.taikin || '未打刻') + '</span></span>';
+      if (d.isHoliday) segs += '<span class="tag-holiday">休日出勤</span>';
+      if (d.taikinMissing) {
+        segs += '<div class="dakoku-note">⚠ 退勤打刻がありません<span class="fix-link" onclick="showSection(\'shuusei\')">打刻修正依頼へ</span></div>';
+      }
+
+      html += '<div class="dakoku-row' + (d.taikinMissing ? ' flagged' : '') + '">' +
+        '<div class="dakoku-date"><div class="d">' + mmdd + '</div><div class="' + dowClass + '">(' + DOW_JP[dt.getDay()] + ')</div></div>' +
+        '<div class="dakoku-times">' + segs + '</div>' +
+        '</div>';
+    });
+    html += '</div>';
     bodyEl.innerHTML = html;
   }
 </script>
