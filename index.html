@@ -1616,18 +1616,23 @@
       });
     } else if (b.shinsei === '中抜け') {
       if (!isJigo) return; // 中抜けは定時に依存しないため、事前は自動取得の必要が無い
-      Promise.all([fetchOne('外出'), fetchOne('帰社')]).then(([g, k]) => {
-        if (g.success && g.time) document.getElementById('yukyuGaishutsuYotei').value = padHHMM(g.time);
-        if (k.success && k.time) document.getElementById('yukyuKishaYotei').value = padHHMM(k.time);
+      // 2026-10-10変更：外出・帰社を1回のGAS呼び出しでまとめて取得する（以前は2回に分けて
+      // 呼んでおり、その分プレビュー表示が遅くなっていた。ユーザー指摘）
+      fetchOne('外出,帰社').then((data) => {
+        if (!data.success) return;
+        if (data.times && data.times['外出']) document.getElementById('yukyuGaishutsuYotei').value = padHHMM(data.times['外出']);
+        if (data.times && data.times['帰社']) document.getElementById('yukyuKishaYotei').value = padHHMM(data.times['帰社']);
         updateYukyuDurationPreview();
       });
     } else if (b.shinsei === '遅刻・中抜け＋早退') {
-      Promise.all([fetchOne('出勤'), fetchOne('退勤')]).then(([s, t]) => {
-        if (s.success && s.teijiStart) myTeijiStart = s.teijiStart;
-        if (t.success && t.teijiEnd) myTeijiEnd = t.teijiEnd;
+      // 2026-10-10変更：出勤・退勤を1回のGAS呼び出しでまとめて取得する（同上の理由）
+      fetchOne('出勤,退勤').then((data) => {
+        if (!data.success) return;
+        if (data.teijiStart) myTeijiStart = data.teijiStart;
+        if (data.teijiEnd) myTeijiEnd = data.teijiEnd;
         if (isJigo) {
-          if (s.success && s.time) document.getElementById('yukyuW1e').value = padHHMM(s.time);
-          if (t.success && t.time) document.getElementById('yukyuW2s').value = padHHMM(t.time);
+          if (data.times && data.times['出勤']) document.getElementById('yukyuW1e').value = padHHMM(data.times['出勤']);
+          if (data.times && data.times['退勤']) document.getElementById('yukyuW2s').value = padHHMM(data.times['退勤']);
           if (myTeijiStart) document.getElementById('yukyuW1s').value = padHHMM(myTeijiStart);
           if (myTeijiEnd) document.getElementById('yukyuW2e').value = padHHMM(myTeijiEnd);
         }
