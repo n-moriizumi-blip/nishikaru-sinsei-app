@@ -268,6 +268,13 @@
     font-size: 13px;
     font-weight: 700;
     margin-top: 10px;
+    white-space: pre-line;
+  }
+  /* 2026-10-10新設：休む時間の合計が2/4/6時間単位に収まらず、送信すると自動で
+     切り上げられる場合の強調表示 */
+  .duration-preview.warn {
+    background: #FCE4D6;
+    color: #7F0000;
   }
   .tool-link {
     display: inline-block;
@@ -1629,12 +1636,12 @@
     }
   }
 
-  // 入力中の時刻から、送信するとどれくらいの時間になるかをその場で計算して表示する
-  // （GAS側のroundJikankyuStart・checkJikanWindowAnomalyと同じ丸め方向・合計計算）
-  function updateYukyuDurationPreview() {
+  // 入力中の時刻から、送信するとどれくらいの時間になるかを計算する
+  // （GAS側のroundJikankyuStart・buildYukyuSubmission_と同じ丸め方向・合計計算）。
+  // 戻り値が無効（null）な場合は入力が揃っていない状態
+  function computeYukyuDurationMin() {
     const b = yukyuBranch();
-    const el = document.getElementById('yukyuDurationPreview');
-    if (!b.isTimeType) { el.classList.add('hidden'); return; }
+    if (!b.isTimeType) return null;
     let totalMin = null;
     if (b.shinsei === '遅刻') {
       const raw = document.getElementById('yukyuShukkinYotei').value;
@@ -1656,9 +1663,35 @@
       if (w2s && w2e) { sum += ceilTo15MinJs(hhmmToMinJs(w2e)) - floorTo15MinJs(hhmmToMinJs(w2s)); any = true; }
       if (any) totalMin = sum;
     }
-    if (totalMin === null || isNaN(totalMin) || totalMin < 0) { el.classList.add('hidden'); return; }
+    if (totalMin === null || isNaN(totalMin) || totalMin < 0) return null;
+    return totalMin;
+  }
+
+  // 2026-10-10新設：就業規則の2/4/6時間単位に収まらない場合、送信すると自動的に切り上げられる
+  // 消化時間を計算する（GAS側buildYukyuSubmission_と同じ丸め方：常に切り上げ、最大6時間）
+  function roundToJikankyuUnit(totalMin) {
+    if ([120, 240, 360].indexOf(totalMin) !== -1) return totalMin;
+    return Math.min(360, Math.ceil(totalMin / 120) * 120);
+  }
+
+  // 入力中の時刻から、送信するとどれくらいの時間になるかをその場で計算して表示する
+  function updateYukyuDurationPreview() {
+    const b = yukyuBranch();
+    const el = document.getElementById('yukyuDurationPreview');
+    const totalMin = computeYukyuDurationMin();
+    if (totalMin === null) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    el.textContent = '⏱ この内容だと ' + Math.floor(totalMin / 60) + '時間' + (totalMin % 60) + '分の申請になります。';
+    let text = '⏱ この内容だと ' + Math.floor(totalMin / 60) + '時間' + (totalMin % 60) + '分の申請になります。';
+    // 欠勤控除（労災含む）は2/4/6時間単位ルールの対象外（GAS側buildYukyuSubmission_と同じ判定）
+    const isKekkinKoujo = b.kbn === '欠勤控除' || b.kbn === '欠勤控除（労災）';
+    const shokaMin = roundToJikankyuUnit(totalMin);
+    if (!isKekkinKoujo && shokaMin !== totalMin) {
+      el.classList.add('warn');
+      text += '\n就業規則では2/4/6時間単位のため、送信すると ' + Math.floor(shokaMin / 60) + '時間' + (shokaMin % 60) + '分 として申請されます。';
+    } else {
+      el.classList.remove('warn');
+    }
+    el.textContent = text;
   }
 
   function loadYukyuRequests() {
@@ -1845,6 +1878,24 @@
     }
     if (!b.isTokubetsu && !payload.riyu) {
       messageEl.className = 'message err'; messageEl.textContent = '理由・備考を入力してください。'; return;
+    }
+
+    // 2026-10-10新設：休む時間の合計が2/4/6時間単位に収まらない場合、送信前に
+    // 「切り上げて申請されます」とひと目で分かるよう確認を挟む（欠勤控除はこのルールの
+    // 対象外、GAS側buildYukyuSubmission_と同じ判定）
+    if (b.isTimeType && b.kbn !== '欠勤控除' && b.kbn !== '欠勤控除（労災）') {
+      const totalMin = computeYukyuDurationMin();
+      if (totalMin !== null) {
+        const shokaMin = roundToJikankyuUnit(totalMin);
+        if (shokaMin !== totalMin) {
+          const ok = confirm(
+            '入力内容だと休む時間の合計が' + Math.floor(totalMin / 60) + '時間' + (totalMin % 60) + '分になります。\n' +
+            '就業規則では2/4/6時間単位のため、' + Math.floor(shokaMin / 60) + '時間として申請されます。\n\n' +
+            'このまま送信しますか？'
+          );
+          if (!ok) return;
+        }
+      }
     }
 
     const btn = document.getElementById('yukyuSubmitBtn');
