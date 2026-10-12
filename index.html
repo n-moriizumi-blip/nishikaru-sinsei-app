@@ -1528,6 +1528,18 @@
   }
   function floorTo15MinJs(min) { return Math.floor(min / 15) * 15; }
   function ceilTo15MinJs(min)  { return Math.ceil(min / 15) * 15; }
+  // 2026-10-12新設：GAS側overlapMinutesWithBreaks（ユーティリティ.gs）・時間休計算ツールの
+  // overlapMinutesWithBreaksと同じロジック。期間[a,b]が昼休憩(12:00-12:45)・
+  // 午後休憩(15:00-15:15)とどれだけ重なるかの合計（分）を返す
+  const KYUKEI_WINDOWS_JS = [[12 * 60, 12 * 60 + 45], [15 * 60, 15 * 60 + 15]];
+  function overlapMinutesWithBreaksJs(a, b) {
+    let total = 0;
+    KYUKEI_WINDOWS_JS.forEach(([s, e]) => {
+      const os = Math.max(a, s), oe = Math.min(b, e);
+      if (oe > os) total += (oe - os);
+    });
+    return total;
+  }
   function padHHMM(s) {
     if (!s) return '';
     const parts = s.split(':');
@@ -1719,28 +1731,47 @@
   // 入力中の時刻から、送信するとどれくらいの時間になるかを計算する
   // （GAS側のroundJikankyuStart・buildYukyuSubmission_と同じ丸め方向・合計計算）。
   // 戻り値が無効（null）な場合は入力が揃っていない状態
+  // 2026-10-12修正：以前は開始〜終了をそのまま引き算していたため、昼休憩・午後休憩を
+  // またぐ申請（例：8:30〜13:15の遅刻）で休憩時間まで「休んだ時間」に数えてしまっていた
+  // （ユーザー指摘）。GAS側buildYukyuSubmission_と同じく、各時間帯から休憩との重なりを
+  // 差し引く
   function computeYukyuDurationMin() {
     const b = yukyuBranch();
     if (!b.isTimeType) return null;
     let totalMin = null;
     if (b.shinsei === '遅刻') {
       const raw = document.getElementById('yukyuShukkinYotei').value;
-      if (raw && myTeijiStart) totalMin = ceilTo15MinJs(hhmmToMinJs(raw)) - hhmmToMinJs(myTeijiStart);
+      if (raw && myTeijiStart) {
+        const s = hhmmToMinJs(myTeijiStart), e = ceilTo15MinJs(hhmmToMinJs(raw));
+        totalMin = (e - s) - overlapMinutesWithBreaksJs(s, e);
+      }
     } else if (b.shinsei === '早退') {
       const raw = document.getElementById('yukyuTaikinYotei').value;
-      if (raw && myTeijiEnd) totalMin = hhmmToMinJs(myTeijiEnd) - floorTo15MinJs(hhmmToMinJs(raw));
+      if (raw && myTeijiEnd) {
+        const s = floorTo15MinJs(hhmmToMinJs(raw)), e = hhmmToMinJs(myTeijiEnd);
+        totalMin = (e - s) - overlapMinutesWithBreaksJs(s, e);
+      }
     } else if (b.shinsei === '中抜け') {
       const rawS = document.getElementById('yukyuGaishutsuYotei').value;
       const rawE = document.getElementById('yukyuKishaYotei').value;
-      if (rawS && rawE) totalMin = ceilTo15MinJs(hhmmToMinJs(rawE)) - floorTo15MinJs(hhmmToMinJs(rawS));
+      if (rawS && rawE) {
+        const s = floorTo15MinJs(hhmmToMinJs(rawS)), e = ceilTo15MinJs(hhmmToMinJs(rawE));
+        totalMin = (e - s) - overlapMinutesWithBreaksJs(s, e);
+      }
     } else if (b.shinsei === '遅刻・中抜け＋早退') {
       const w1s = document.getElementById('yukyuW1s').value;
       const w1e = document.getElementById('yukyuW1e').value;
       const w2s = document.getElementById('yukyuW2s').value;
       const w2e = document.getElementById('yukyuW2e').value;
       let sum = 0, any = false;
-      if (w1s && w1e) { sum += ceilTo15MinJs(hhmmToMinJs(w1e)) - floorTo15MinJs(hhmmToMinJs(w1s)); any = true; }
-      if (w2s && w2e) { sum += ceilTo15MinJs(hhmmToMinJs(w2e)) - floorTo15MinJs(hhmmToMinJs(w2s)); any = true; }
+      if (w1s && w1e) {
+        const s = floorTo15MinJs(hhmmToMinJs(w1s)), e = ceilTo15MinJs(hhmmToMinJs(w1e));
+        sum += (e - s) - overlapMinutesWithBreaksJs(s, e); any = true;
+      }
+      if (w2s && w2e) {
+        const s = floorTo15MinJs(hhmmToMinJs(w2s)), e = ceilTo15MinJs(hhmmToMinJs(w2e));
+        sum += (e - s) - overlapMinutesWithBreaksJs(s, e); any = true;
+      }
       if (any) totalMin = sum;
     }
     if (totalMin === null || isNaN(totalMin) || totalMin < 0) return null;
