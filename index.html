@@ -131,27 +131,50 @@
     margin-top: 6px;
     min-height: 1.2em;
   }
-  .radio-group { display: flex; flex-direction: column; gap: 8px; }
-  .radio-group.row { flex-direction: row; }
+  /* 2026-10-12：選択肢（有給種別・申請種別等）はモックアップ検討で決めた「ピルボタン」表示に統一。
+     以前は縦積みの全幅リストだったが、同じ幅・同じ高さのマス目に並べるグリッドに変更し、
+     選択状態は背景色の変化だけで示す（ネイティブのラジオボタン自体はアクセシビリティのため
+     残すが、視覚的には隠す）。「（0.5日）」等の補足はpill-subで必ず2行目に分けて表示する
+     （折り返し位置がブラウザ任せだと不自然になるため） */
+  .radio-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .radio-group.row { display: flex; flex-direction: row; }
   .radio-pill {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
+    justify-content: center;
+    gap: 0;
+    padding: 9px 10px;
+    min-height: 52px;
     border: 1px solid var(--line);
-    border-radius: var(--radius-s);
+    border-radius: var(--radius-l);
     cursor: pointer;
-    font-size: 14.5px;
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.3;
     background: var(--surface);
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
-  .radio-group.row .radio-pill { flex: 1; justify-content: center; }
+  .radio-pill input {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  .pill-sub { display: block; font-size: 10.5px; font-weight: 400; opacity: .75; margin-top: 1px; }
+  .radio-group.row .radio-pill {
+    flex: 1; flex-direction: row; min-height: 0; padding: 10px 14px; gap: 10px;
+    border-radius: var(--radius-s); font-size: 14.5px;
+  }
+  .radio-group.row .radio-pill input {
+    position: static; width: 17px; height: 17px; clip: auto; overflow: visible; margin: 0;
+    accent-color: var(--primary);
+  }
   .radio-pill:has(input:checked) {
     border-color: var(--primary);
     background: var(--primary);
     font-weight: 700;
     color: var(--primary-ink);
   }
-  .radio-pill input { accent-color: var(--primary); width: 17px; height: 17px; }
   .primary-btn {
     width: 100%;
     margin-top: 26px;
@@ -617,11 +640,11 @@
   <label>有給種別／控除区分</label>
   <div class="radio-group" id="yukyuKbnGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="通常有給"> 通常有給</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給（傷病・介護のみ）</label>
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除"> 欠勤控除</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除（労災）"> 欠勤控除（労災）</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（弔事）"> 特別休暇（弔事）</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（慶事）"> 特別休暇（慶事）</label>
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除（労災）"> 欠勤控除<span class="pill-sub">（労災）</span></label>
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（弔事）"> 特別休暇<span class="pill-sub">（弔事）</span></label>
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（慶事）"> 特別休暇<span class="pill-sub">（慶事）</span></label>
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="傷病等特別休暇"> 傷病等特別休暇</label>
   </div>
 
@@ -629,8 +652,8 @@
     <label>申請種別</label>
     <div class="radio-group" id="yukyuShinseiGroup">
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="1日"> 1日〜複数日</label>
-      <label class="radio-pill yukyu-halfday-pill"><input type="radio" name="yukyuShinsei" value="午前休（0.5日）"> 午前休（0.5日）</label>
-      <label class="radio-pill yukyu-halfday-pill"><input type="radio" name="yukyuShinsei" value="午後休（0.5日）"> 午後休（0.5日）</label>
+      <label class="radio-pill yukyu-halfday-pill"><input type="radio" name="yukyuShinsei" value="午前休（0.5日）"> 午前休<span class="pill-sub">（0.5日）</span></label>
+      <label class="radio-pill yukyu-halfday-pill"><input type="radio" name="yukyuShinsei" value="午後休（0.5日）"> 午後休<span class="pill-sub">（0.5日）</span></label>
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="遅刻"> 遅刻</label>
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="早退"> 早退</label>
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="中抜け"> 中抜け</label>
@@ -716,7 +739,7 @@
     <label>続柄</label>
     <div class="radio-group" id="yukyuZokugaraKeijiGroup">
       <label class="radio-pill"><input type="radio" name="yukyuZokugaraKeiji" value="本人が結婚"> 本人が結婚</label>
-      <label class="radio-pill"><input type="radio" name="yukyuZokugaraKeiji" value="兄弟（配偶者の兄弟も）"> 兄弟（配偶者の兄弟も）</label>
+      <label class="radio-pill"><input type="radio" name="yukyuZokugaraKeiji" value="兄弟（配偶者の兄弟も）"> 兄弟<span class="pill-sub">（配偶者の兄弟も）</span></label>
       <label class="radio-pill"><input type="radio" name="yukyuZokugaraKeiji" value="子"> 子</label>
     </div>
   </div>
