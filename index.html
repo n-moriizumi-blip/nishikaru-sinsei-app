@@ -78,7 +78,11 @@
     padding-top: 16px;
     border-top: 1px solid var(--line);
   }
-  label:not(.radio-pill):first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  /* 2026-10-12修正：以前は:first-of-typeでカード内「最初の」見出しだけ区切り線を省いていたが、
+     多くの項目は条件付き表示用の<div>でラップされており親要素がバラバラなため、
+     :first-of-typeが「各<div>内で最初」という意図しない単位で効いてしまい、区切り線が
+     抜ける箇所が複数できていた（ユーザー指摘）。全ての見出しに一律で区切り線を付けるよう
+     シンプルにした（カード上部の見出しも含め、どこで区切れているか分かりやすい方を優先） */
   label:not(.radio-pill)::before {
     content: "";
     flex: 0 0 auto;
@@ -95,6 +99,16 @@
     background: var(--surface);
     color: var(--ink);
   }
+  /* 2026-10-12新設：代理入力欄（総務専用）は点線の枠で囲み、「普段は使わない特別な欄」だと
+     一目で分かるようにする（モックアップの.dairi-box案を採用） */
+  .dairi-box {
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-m);
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+  .dairi-box label:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .dairi-box .hint { margin-bottom: 0; }
   /* 代理入力（総務専用）バナー：色を変えて「今誰の代わりに入力しているか」を常に意識できるようにする */
   .dairi-banner {
     background: #FFF2CC;
@@ -340,9 +354,15 @@
     margin-top: 6px;
   }
   /* ── マイページ ── */
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; margin-top: 8px; }
+  /* 2026-10-12修正：以前はgap:1px+背景色でマス目の罫線を表現していたが、項目数が奇数で
+     最後のマスが埋まらない場合、そこだけ地の背景色（茶色）がそのまま塗りつぶされて見える
+     不具合があった（ユーザー指摘）。各マスそのものに枠線を付ける方式に変更し、
+     空きマスが生じても塗りつぶしが残らないようにした */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
   .info-item {
     background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-s);
     padding: 10px 12px;
   }
   .info-item .info-label { font-size: 11.5px; color: var(--ink-dim); margin-bottom: 2px; }
@@ -381,7 +401,7 @@
   </div>
   <div class="card-body">
     <p class="shorei-banner hidden" id="yukyuShoreiBanner"></p>
-    <div id="dairiPickerArea" class="hidden">
+    <div id="dairiPickerArea" class="dairi-box hidden">
       <label style="margin-top:0;">代理入力（総務専用）</label>
       <select id="dairiSelect" onchange="onDairiChange()">
         <option value="">本人（代理入力しない）</option>
