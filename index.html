@@ -166,7 +166,10 @@
     font-size: 13px;
     text-align: center;
     line-height: 1.3;
-    background: var(--surface);
+    /* 2026-10-12修正：カード自体の背景(--surface)と同じ色だったため、選ばれていない
+       ボタンが白っぽく埋もれて見えていた（ユーザー指摘、モックアップでは地の色(--bg)に
+       乗っていたため区別できていた）。カードより一段濃い--bgを背景にして区別できるようにした */
+    background: var(--bg);
     word-break: keep-all;
     overflow-wrap: break-word;
   }
