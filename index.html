@@ -20,12 +20,15 @@
      旧配色（濃紺#1F3A52＋山吹色#F2A900）はトークンとして全てこちらへ置き換えた。
      ============================================================ */
   :root{
-    --bg:#EDE7DC; --surface:#FBF8F1; --ink:#262016; --ink-dim:#7A6F5B;
+    --bg:#EDE7DC; --surface:#E6DCC2; --field:#FFFFFF; --ink:#262016; --ink-dim:#7A6F5B;
     --line:#CBBFA3; --primary:#2F4A3C; --primary-ink:#FBF8F1;
     --accent:#D98A12; --accent-ink:#241A04;
     --radius-s:6px; --radius-m:12px; --radius-l:22px;
     --display:"Rampart One",sans-serif; --body:"BIZ UDGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif; --mono:"JetBrains Mono",monospace;
   }
+  /* 2026-10-12修正：ボタンや入力枠は白く(--field)、その他のカード本体等の背景には
+     色を付ける(--surfaceを地の色--bgより一段濃いトーンに)。「どこが操作・入力できる
+     場所か」が一目で分かるようにする（ユーザー指摘） */
   * { box-sizing: border-box; }
   body {
     font-family: var(--body);
@@ -96,7 +99,7 @@
     font-size: 15px;
     border: 1px solid var(--line);
     border-radius: var(--radius-s);
-    background: var(--surface);
+    background: var(--field);
     color: var(--ink);
   }
   /* 2026-10-12新設：代理入力欄（総務専用）は点線の枠で囲み、「普段は使わない特別な欄」だと
@@ -166,10 +169,9 @@
     font-size: 13px;
     text-align: center;
     line-height: 1.3;
-    /* 2026-10-12修正：カード自体の背景(--surface)と同じ色だったため、選ばれていない
-       ボタンが白っぽく埋もれて見えていた（ユーザー指摘、モックアップでは地の色(--bg)に
-       乗っていたため区別できていた）。カードより一段濃い--bgを背景にして区別できるようにした */
-    background: var(--bg);
+    /* 2026-10-12修正：選択肢ボタンは白(--field)にして、色付きのカード本体(--surface)の上で
+       はっきり「押せる場所」だと分かるようにした（ユーザー指摘） */
+    background: var(--field);
     word-break: keep-all;
     overflow-wrap: break-word;
   }
@@ -211,7 +213,7 @@
     margin-top: 10px;
     padding: 11px;
     font-size: 14px;
-    background: var(--surface);
+    background: var(--field);
     color: var(--ink-dim);
     border: 1px solid var(--line);
     border-radius: var(--radius-m);
@@ -249,7 +251,7 @@
     padding: 5px 12px;
     border: 1px solid var(--primary);
     color: var(--primary);
-    background: var(--surface);
+    background: var(--field);
     border-radius: 999px;
     cursor: pointer;
     margin-top: 8px;
@@ -272,7 +274,7 @@
     margin-bottom: 12px;
     border: 1px solid var(--line);
     border-radius: var(--radius-m);
-    background: var(--surface);
+    background: var(--field);
     cursor: pointer;
     font-size: 15.5px;
     font-weight: 700;
