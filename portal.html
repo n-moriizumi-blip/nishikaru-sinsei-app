@@ -99,7 +99,7 @@
   .f input, .f select{background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px 10px;
     font-size:13px; font-family:var(--body); color:var(--ink); min-width:150px;}
   .f.grow{flex:1; min-width:200px;}
-  .f.grow input{width:100%;}
+  .f.grow input, .f.grow select{width:100%;}
   .pills{display:flex; gap:6px; flex-wrap:wrap;}
   .pill{font-size:11.5px; font-weight:700; padding:7px 12px; border-radius:5px; cursor:pointer; border:1px solid var(--line);
     background:var(--field); color:var(--dim); font-family:var(--mono);}
@@ -227,7 +227,8 @@
       <div class="pagehead"><h1>申請一覧</h1><span class="sub">SHINSEI-KANRI / LIVE QUEUE</span></div>
 
       <div class="filterbar">
-        <div class="f grow"><label>Search</label><input type="search" id="f-search" placeholder="氏名・申請IDで検索"></div>
+        <div class="f"><label>申請ID</label><select id="f-id"><option value="">すべて</option></select></div>
+        <div class="f grow"><label>氏名</label><select id="f-name"><option value="">すべて</option></select></div>
         <div class="f"><label>種別</label>
           <select id="f-type"><option value="">すべて</option><option value="yukyu">有給・遅刻・早退・特別休暇</option>
             <option value="zangyou">残業</option><option value="chokkou">直行・直帰・出張</option></select></div>
@@ -284,7 +285,7 @@
   var GAS_URL = 'https://script.google.com/a/macros/nishikaru.co.jp/s/AKfycbzht6wuAjcOKeiGL20sHIEE1ip10b7haJfb5lFNahg7XN-ZBKZtwhxE3sfPhydCA21xYg/exec';
   var idToken = null, myEmail = '';
   var ROWS = [];
-  var state = { search:'', type:'', status:'' };
+  var state = { id:'', name:'', type:'', status:'' };
   var currentId = null;
   var busy = false;
 
@@ -339,11 +340,26 @@
   function matches(r){
     if (state.status && r.status !== state.status) return false;
     if (state.type && categoryOf(r) !== state.type) return false;
-    if (state.search){
-      var q = state.search.toLowerCase();
-      if (r.name.toLowerCase().indexOf(q) === -1 && r.appId.toLowerCase().indexOf(q) === -1) return false;
-    }
+    if (state.id && r.appId !== state.id) return false;
+    if (state.name && r.name !== state.name) return false;
     return true;
+  }
+
+  // ROWS読み込み後、申請ID・氏名プルダウンの選択肢を実データから作り直す。
+  // 選び直す必要が無いよう、既に選択中の値がまだ候補にあれば維持する
+  function populateFilterDropdowns(){
+    var idSel = document.getElementById('f-id'), nameSel = document.getElementById('f-name');
+    var ids = Array.from(new Set(ROWS.map(function(r){ return r.appId; }))).sort().reverse();
+    var names = Array.from(new Set(ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+
+    idSel.innerHTML = '<option value="">すべて</option>' +
+      ids.map(function(id){ return '<option value="' + escapeHtml(id) + '">' + escapeHtml(id) + '</option>'; }).join('');
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+
+    idSel.value = ids.indexOf(state.id) !== -1 ? state.id : '';
+    nameSel.value = names.indexOf(state.name) !== -1 ? state.name : '';
+    state.id = idSel.value; state.name = nameSel.value;
   }
 
   function render(){
@@ -371,7 +387,8 @@
     document.getElementById('resultcount').textContent = filtered.length + ' 件（全' + ROWS.length + '件中）';
   }
 
-  document.getElementById('f-search').addEventListener('input', function(e){ state.search = e.target.value; render(); });
+  document.getElementById('f-id').addEventListener('change', function(e){ state.id = e.target.value; render(); });
+  document.getElementById('f-name').addEventListener('change', function(e){ state.name = e.target.value; render(); });
   document.getElementById('f-type').addEventListener('change', function(e){ state.type = e.target.value; render(); });
   document.getElementById('f-status').addEventListener('click', function(e){
     var btn = e.target.closest('.pill'); if (!btn) return;
@@ -466,6 +483,7 @@
           r.detail = buildDetail(r);
           return r;
         });
+        populateFilterDropdowns();
         render();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
