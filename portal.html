@@ -255,6 +255,12 @@
   .resolvedbadge.mi{background:#FBEAEA; color:var(--denied); border-color:var(--denied);}
   .resolvedbadge.sumi{background:#EAF3EC; color:var(--approved); border-color:var(--approved);}
 
+  .statuspill{font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; border:1px solid; background:#fff;}
+  .statuspill.pending{color:var(--pending); border-color:var(--pending);}
+  .statuspill.provisional{color:var(--provisional); border-color:var(--provisional);}
+  .statuspill.approved{color:var(--approved); border-color:var(--approved);}
+  .statuspill.denied{color:var(--denied); border-color:var(--denied);}
+
   .homearrow{color:var(--dim); font-weight:700; text-decoration:none;}
   .homefooter{font-size:12px; color:var(--dim); padding:10px 2px 0; border-top:1px dashed var(--line); margin-top:4px;}
 
@@ -1775,7 +1781,10 @@
       function(r){ jumpToTab('shuukei', r.name); });
 
     renderHomeList('home-shusei-list', data.shusei, '現在、対象はありません',
-      function(r){ return escapeHtml(r.content); },
+      function(r){
+        var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
+        return escapeHtml(r.content) + '<span class="statuspill ' + st[0] + '">' + st[1] + '</span>';
+      },
       function(r){ jumpToTab('shusei', r.name); });
   }
 
