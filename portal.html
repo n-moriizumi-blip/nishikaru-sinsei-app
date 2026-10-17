@@ -400,8 +400,8 @@
     <div id="page-dengon" hidden>
       <div class="pagehead"><h1>伝言板</h1><span class="sub">DENGONBAN / MESSAGE BOARD</span></div>
       <div class="filterbar">
-        <div class="f grow"><label>宛先氏名</label><select id="fd-name"><option value="">すべて</option></select></div>
-        <div class="f"><label>状況</label><select id="fd-status"><option value="">すべて</option>
+        <div class="f grow"><label>宛先氏名</label><select id="fdg-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>状況</label><select id="fdg-status"><option value="">すべて</option>
           <option value="表示">未確認</option><option value="済">確認済み</option></select></div>
         <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="dengon-refresh">再読み込み</button></div>
         <div class="f"><label>&nbsp;</label><button class="newbtn" id="dengon-new">＋ 新規作成</button></div>
@@ -1383,7 +1383,7 @@
   }
 
   function populateDengonDropdown(){
-    var nameSel = document.getElementById('fd-name');
+    var nameSel = document.getElementById('fdg-name');
     var names = Array.from(new Set(DENGON_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
     nameSel.innerHTML = '<option value="">すべて</option>' +
       names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
@@ -1418,8 +1418,8 @@
     document.getElementById('dengon-resultcount').textContent = filtered.length + ' 件（全' + DENGON_ROWS.length + '件中）';
   }
 
-  document.getElementById('fd-name').addEventListener('change', function(e){ dgState.name = e.target.value; renderDengon(); });
-  document.getElementById('fd-status').addEventListener('change', function(e){ dgState.status = e.target.value; renderDengon(); });
+  document.getElementById('fdg-name').addEventListener('change', function(e){ dgState.name = e.target.value; renderDengon(); });
+  document.getElementById('fdg-status').addEventListener('change', function(e){ dgState.status = e.target.value; renderDengon(); });
   document.getElementById('dengon-refresh').addEventListener('click', function(){ loadDengonList(); });
 
   var ddDrawer = document.getElementById('dd-drawer'), ddBackdrop = document.getElementById('dd-backdrop');
