@@ -320,6 +320,7 @@
       <button data-nav="yukyu"><span class="ic">🏖️</span>有給管理</button>
       <button data-nav="tokubetsu"><span class="ic">🎌</span>特別休暇管理</button>
       <button data-nav="dengon"><span class="ic">💬</span>伝言板</button>
+      <button data-nav="gesshu"><span class="ic">📅</span>月次集計</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -528,6 +529,24 @@
           <tbody id="dengon-tbody"></tbody>
         </table>
         <div class="emptystate" id="dengon-emptystate" hidden>条件に一致するデータがありません。</div>
+      </div>
+    </div>
+    <div id="page-gesshu" hidden>
+      <div class="pagehead"><h1>月次集計</h1><span class="sub">GESSHU-SHUUKEI / MONTHLY（給与じまん入力用）</span></div>
+      <div class="filterbar">
+        <div class="f"><label>対象月</label><select id="fg-label"></select></div>
+        <div class="f grow"><label>氏名</label><select id="fg-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="gesshu-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="gesshu-resultcount"></p>
+      <div class="sheet">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead id="gesshu-thead"></thead>
+            <tbody id="gesshu-tbody"></tbody>
+          </table>
+        </div>
+        <div class="emptystate" id="gesshu-emptystate" hidden>データがありません。</div>
       </div>
     </div>
     <div id="page-shain" hidden>
@@ -907,7 +926,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var shinseiLoaded = false, dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false;
+  var shinseiLoaded = false, dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false, gesshuLoaded = false;
   // ジャンプ＋絞り込み（ホーム画面の一覧から該当タブを開いて氏名等で絞り込む）のため、
   // 各タブの初回読み込みのPromiseをここに保持する。既に読み込み済みのタブはresolve済みの
   // ままなので、jumpToTabは毎回.then()するだけで「未読込なら待つ・既読込なら即実行」を両立できる
@@ -916,7 +935,7 @@
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['home','shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','shain'].forEach(function(name){
+      ['home','shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','gesshu','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
       // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
@@ -927,6 +946,7 @@
       if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; tabReady.yukyu = loadYukyuList(); }
       if (btn.dataset.nav === 'tokubetsu' && !tokubetsuLoaded) { tokubetsuLoaded = true; loadTokubetsuList(); }
       if (btn.dataset.nav === 'dengon' && !dengonLoaded) { dengonLoaded = true; loadDengonList(); }
+      if (btn.dataset.nav === 'gesshu' && !gesshuLoaded) { gesshuLoaded = true; loadGesshuList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
@@ -1656,6 +1676,80 @@
         renderDengon();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 月次集計・週別実働・打刻確認（月ごとに別シートのため共通の月選択が必要） ──
+  // 月次集計シートの名前から拾った月ラベル一覧（週別実働・打刻確認も同時に作られるため共通で使う）
+  var MONTHLY_LABELS = [];
+  function ensureMonthlyLabelsLoaded_(cb){
+    if (MONTHLY_LABELS.length > 0) { cb(); return; }
+    fetch(GAS_URL + '?mode=portalMonthlyLabels&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){ if (data.success) MONTHLY_LABELS = data.labels || []; cb(); })
+      .catch(function(){ cb(); });
+  }
+  // 月選択<select>の選択肢をMONTHLY_LABELSから作り直す。currentLabelがまだ候補にあれば維持し、
+  // 無ければ最新（先頭）を選ぶ。選ばれた値を返す
+  function populateMonthlyLabelSelect_(selectId, currentLabel){
+    var sel = document.getElementById(selectId);
+    sel.innerHTML = MONTHLY_LABELS.map(function(l){ return '<option value="' + l + '">' + l + '</option>'; }).join('');
+    sel.value = MONTHLY_LABELS.indexOf(currentLabel) !== -1 ? currentLabel : (MONTHLY_LABELS[0] || '');
+    return sel.value;
+  }
+
+  // ── 月次集計（閲覧専用。給与じまん入力用の固定31列シートをそのまま表示） ──
+  var GESSHU_HEADERS = [], GESSHU_ROWS = [];
+  var gState = { label:'', name:'' };
+
+  function gMatches(r){ return !gState.name || r.values[0] === gState.name; }
+
+  function populateGesshuNameDropdown(){
+    var nameSel = document.getElementById('fg-name');
+    var names = Array.from(new Set(GESSHU_ROWS.map(function(r){ return r.values[0]; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(gState.name) !== -1 ? gState.name : '';
+    gState.name = nameSel.value;
+  }
+
+  function renderGesshuTable(){
+    document.getElementById('gesshu-thead').innerHTML =
+      '<tr>' + GESSHU_HEADERS.map(function(h){ return '<th>' + escapeHtml(h).replace(/\n/g, '<br>') + '</th>'; }).join('') + '</tr>';
+    var tbody = document.getElementById('gesshu-tbody');
+    var filtered = GESSHU_ROWS.filter(gMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.innerHTML = r.values.map(function(v, i){
+        var text = (v === null || v === undefined) ? '' : String(v);
+        return '<td class="' + (i === 0 ? 'name' : 'mono') + '">' + escapeHtml(text) + '</td>';
+      }).join('');
+      tbody.appendChild(tr);
+    });
+    document.getElementById('gesshu-emptystate').hidden = filtered.length > 0;
+    document.getElementById('gesshu-resultcount').textContent = filtered.length + ' 名（全' + GESSHU_ROWS.length + '名中）';
+  }
+
+  document.getElementById('fg-name').addEventListener('change', function(e){ gState.name = e.target.value; renderGesshuTable(); });
+  document.getElementById('fg-label').addEventListener('change', function(e){ gState.label = e.target.value; loadGesshuList(); });
+  document.getElementById('gesshu-refresh').addEventListener('click', function(){ loadGesshuList(); });
+
+  function loadGesshuList(){
+    document.getElementById('gesshu-resultcount').textContent = '読み込み中…';
+    ensureMonthlyLabelsLoaded_(function(){
+      gState.label = populateMonthlyLabelSelect_('fg-label', gState.label);
+      if (!gState.label) { document.getElementById('gesshu-resultcount').textContent = '利用可能な月がありません。'; return; }
+      fetch(GAS_URL + '?mode=portalGesshuList&token=' + encodeURIComponent(idToken) + '&label=' + encodeURIComponent(gState.label))
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+          if (!data.success) { showToast(data.error || '月次集計の取得に失敗しました。', true); return; }
+          GESSHU_HEADERS = data.headers || [];
+          GESSHU_ROWS = data.rows || [];
+          populateGesshuNameDropdown();
+          renderGesshuTable();
+        })
+        .catch(function(){ showToast('通信エラーが発生しました。', true); });
+    });
   }
 
   // ── ホーム（ダッシュボード） ──
