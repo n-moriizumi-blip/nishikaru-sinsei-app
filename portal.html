@@ -223,6 +223,7 @@
     <div class="brand"><div class="mark">西</div><div class="tx">勤怠管理<br>ポータル<small>西軽精機・総務課</small></div></div>
     <nav>
       <button class="active" data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
+      <button data-nav="shusei"><span class="ic">🛠️</span>修正依頼</button>
       <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
       <button data-nav="shuukei"><span class="ic">📊</span>月次集計・36協定</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
@@ -261,6 +262,34 @@
           <tbody id="tbody"></tbody>
         </table>
         <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
+      </div>
+    </div>
+
+    <div id="page-shusei" hidden>
+      <div class="pagehead"><h1>修正依頼</h1><span class="sub">SHUSEI-IRAI / CORRECTION QUEUE</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="fs-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>内容</label><select id="fs-content"><option value="">すべて</option>
+          <option>出勤時刻の修正</option><option>退勤時刻の修正</option><option>外出時刻の修正</option>
+          <option>帰社時刻の修正</option><option>打刻の追加</option><option>打刻の削除</option></select></div>
+        <div class="f"><label>対象日</label><input type="date" id="fs-date"></div>
+        <div class="f"><label>状況</label>
+          <div class="pills" id="fs-status">
+            <button class="pill" aria-pressed="true" data-status="">すべて</button>
+            <button class="pill" aria-pressed="false" data-status="承認待">待</button>
+            <button class="pill" aria-pressed="false" data-status="仮承認">仮</button>
+            <button class="pill" aria-pressed="false" data-status="承認済">済</button>
+            <button class="pill" aria-pressed="false" data-status="否認">否</button>
+          </div></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="shusei-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="shusei-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>ID</th><th>氏名</th><th>内容</th><th>対象日</th><th>正しい時刻</th><th>判定</th><th>操作</th></tr></thead>
+          <tbody id="shusei-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="shusei-emptystate" hidden>条件に一致する修正依頼がありません。</div>
       </div>
     </div>
 
@@ -304,6 +333,23 @@
     <dt>理由・備考</dt><dd><div class="reason" id="d-reason"></div></dd>
   </dl>
   <div class="drawer-actions" id="d-actions"></div>
+</div>
+
+<div class="drawer-backdrop" id="s-backdrop"></div>
+<div class="drawer" id="s-drawer" aria-hidden="true">
+  <button class="drawer-close" id="s-drawer-close">← 一覧へ戻る</button>
+  <h2 id="s-name"></h2>
+  <div class="appid" id="s-appid"></div>
+  <dl>
+    <dt>申請日時</dt><dd id="s-appdt"></dd>
+    <dt>内容</dt><dd id="s-content"></dd>
+    <dt>対象日</dt><dd id="s-date"></dd>
+    <dt>正しい時刻</dt><dd id="s-jissai"></dd>
+    <dt>判定</dt><dd id="s-status"></dd>
+    <div id="s-extra"></div>
+    <dt>修正理由</dt><dd><div class="reason" id="s-reason"></div></dd>
+  </dl>
+  <div class="drawer-actions" id="s-actions"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -531,16 +577,17 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['shinsei','dakoku','shuukei','shain'].forEach(function(name){
+      ['shinsei','shusei','dakoku','shuukei','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
-      // 打刻ログは初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
+      // 打刻ログ・修正依頼は初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
       if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
+      if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
     });
   });
 
@@ -615,6 +662,132 @@
         DAKOKU_ROWS = data.rows || [];
         populateDakokuDropdown();
         renderDakoku();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 修正依頼（申請一覧と同じ承認/否認/差し戻しの仕組み） ──
+  var SHUSEI_ROWS = [];
+  var sState = { name:'', content:'', date:'', status:'' };
+  var sCurrentId = null;
+
+  function buildShuseiDetail(r){ return r.content + (r.addType ? '（' + r.addType + '）' : ''); }
+
+  function sMatches(r){
+    if (sState.status && r.status !== sState.status) return false;
+    if (sState.content && r.content !== sState.content) return false;
+    if (sState.name && r.name !== sState.name) return false;
+    if (sState.date && normDate(r.taishouDate).indexOf(normDate(sState.date)) !== 0) return false;
+    return true;
+  }
+
+  function populateShuseiDropdown(){
+    var nameSel = document.getElementById('fs-name');
+    var names = Array.from(new Set(SHUSEI_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(sState.name) !== -1 ? sState.name : '';
+    sState.name = nameSel.value;
+  }
+
+  function renderShusei(){
+    var tbody = document.getElementById('shusei-tbody');
+    var filtered = SHUSEI_ROWS.filter(sMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.id = r.appId;
+      var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
+      var btns = actionsFor(r.status, 'row').map(function(a){
+        return '<button class="rb ' + a[0] + '" data-act="' + a[1] + '" data-id="' + escapeHtml(r.appId) + '">' + a[2] + '</button>';
+      }).join('');
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(buildShuseiDetail(r)) + '</td>' +
+        '<td class="mono">' + escapeHtml(r.taishouDate || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
+        '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
+        '<td><div class="rowbtns">' + btns + '</div></td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('shusei-emptystate').hidden = filtered.length > 0;
+    document.getElementById('shusei-resultcount').textContent = filtered.length + ' 件（全' + SHUSEI_ROWS.length + '件中）';
+  }
+
+  document.getElementById('fs-name').addEventListener('change', function(e){ sState.name = e.target.value; renderShusei(); });
+  document.getElementById('fs-content').addEventListener('change', function(e){ sState.content = e.target.value; renderShusei(); });
+  document.getElementById('fs-date').addEventListener('change', function(e){ sState.date = e.target.value; renderShusei(); });
+  document.getElementById('fs-status').addEventListener('click', function(e){
+    var btn = e.target.closest('.pill'); if (!btn) return;
+    document.querySelectorAll('#fs-status .pill').forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+    btn.setAttribute('aria-pressed','true'); sState.status = btn.dataset.status; renderShusei();
+  });
+  document.getElementById('shusei-refresh').addEventListener('click', function(){ loadShuuseiList(); });
+
+  var sDrawer = document.getElementById('s-drawer'), sBackdrop = document.getElementById('s-backdrop');
+  function openShuseiDrawer(id){
+    var r = SHUSEI_ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
+    sCurrentId = id;
+    document.getElementById('s-name').textContent = r.name;
+    document.getElementById('s-appid').textContent = id;
+    document.getElementById('s-appdt').textContent = r.appDateTime || '—';
+    document.getElementById('s-content').textContent = buildShuseiDetail(r);
+    document.getElementById('s-date').textContent = r.taishouDate || '—';
+    document.getElementById('s-jissai').textContent = r.jissaiTime || '—';
+    var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
+    document.getElementById('s-status').innerHTML = '<span class="stamp ' + st[0] + '">' + st[1] + '</span>';
+    document.getElementById('s-reason').textContent = r.riyu || '（記入なし）';
+    document.getElementById('s-extra').innerHTML = r.autoResult
+      ? ('<dt>自動処理結果</dt><dd>' + escapeHtml(r.autoResult) + '</dd>') : '';
+    document.getElementById('s-actions').innerHTML = actionsFor(r.status, 'drawer').map(function(a){
+      return '<button class="' + a[0] + '" data-act="' + a[1] + '" data-id="' + escapeHtml(r.appId) + '">' + a[2] + '</button>';
+    }).join('');
+    sDrawer.classList.add('open'); sDrawer.setAttribute('aria-hidden','false'); sBackdrop.classList.add('open');
+  }
+  function closeShuseiDrawer(){ sDrawer.classList.remove('open'); sDrawer.setAttribute('aria-hidden','true'); sBackdrop.classList.remove('open'); sCurrentId = null; }
+  document.getElementById('s-drawer-close').addEventListener('click', closeShuseiDrawer);
+  sBackdrop.addEventListener('click', closeShuseiDrawer);
+
+  function doShuseiAction(id, act){
+    if (busy) return;
+    var r = SHUSEI_ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
+    var newStatus = STATUS_FOR_ACT[act];
+    busy = true;
+    setButtonsDisabled(true);
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateShuuseiStatus', token: idToken, appId: id, status: newStatus })
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        busy = false; setButtonsDisabled(false);
+        if (!data.success) { showToast(data.message || '処理に失敗しました。', true); return; }
+        showToast((newStatus === '承認待' ? '承認待に差し戻しました' : newStatus + 'にしました') + '：' + r.name + '（' + id + '）');
+        if (sCurrentId === id) closeShuseiDrawer();
+        loadShuuseiList();
+      })
+      .catch(function(){ busy = false; setButtonsDisabled(false); showToast('通信エラーが発生しました。', true); });
+  }
+
+  document.getElementById('shusei-tbody').addEventListener('click', function(e){
+    var actBtn = e.target.closest('[data-act]');
+    if (actBtn){ e.stopPropagation(); doShuseiAction(actBtn.dataset.id, actBtn.dataset.act); return; }
+    var tr = e.target.closest('tr'); if (tr) openShuseiDrawer(tr.dataset.id);
+  });
+  document.getElementById('s-actions').addEventListener('click', function(e){
+    var b = e.target.closest('[data-act]'); if (b) doShuseiAction(b.dataset.id, b.dataset.act);
+  });
+
+  function loadShuuseiList(){
+    document.getElementById('shusei-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalShuuseiList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || '修正依頼一覧の取得に失敗しました。', true); return; }
+        SHUSEI_ROWS = data.rows || [];
+        populateShuseiDropdown();
+        renderShusei();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
