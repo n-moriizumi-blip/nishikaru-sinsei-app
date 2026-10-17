@@ -1103,7 +1103,9 @@
     yState.name = nameSel.value;
   }
 
-  function fmtDay_(n){ return (Math.round(n * 10) / 10) + '日'; }
+  // シートと同じ小数点以下2桁まで表示する（以前は1桁に丸めてしまい、29.25→29.3のように
+  // シートの実際の値とズレて見えていた。ユーザー指摘）
+  function fmtDay_(n){ return (Math.round(n * 100) / 100) + '日'; }
 
   function renderYukyu(){
     var tbody = document.getElementById('yukyu-tbody');
