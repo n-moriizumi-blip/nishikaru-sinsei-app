@@ -133,6 +133,14 @@
   .stamp.approved{border-color:var(--approved); color:var(--approved);}
   .stamp.denied{border-color:var(--denied); color:var(--denied);}
 
+  /* ── 打刻種別の色分け（打刻ログシートの出勤=緑/退勤=青/外出=黄/帰社=紫と同系統） ── */
+  tr.type-shukkin{border-left:4px solid #4C8C5B; background:#F3F8F3;}
+  tr.type-taikin{border-left:4px solid #3A6EA5; background:#EFF4FA;}
+  tr.type-gaishutsu{border-left:4px solid #B8862F; background:#FBF6EA;}
+  tr.type-kisha{border-left:4px solid #7A4F8C; background:#F7F1F8;}
+  tr.type-shukkin td:first-child, tr.type-taikin td:first-child,
+  tr.type-gaishutsu td:first-child, tr.type-kisha td:first-child{padding-left:9px;}
+
   .rowbtns{display:flex; gap:6px;}
   .rb{font-family:var(--mono); font-size:11px; font-weight:700; padding:5px 11px; border-radius:5px;
     border:1px solid var(--line); cursor:pointer; background:var(--field); color:var(--dim);}
@@ -572,12 +580,14 @@
     dState.name = nameSel.value;
   }
 
+  var DAKOKU_TYPE_CLASS = {'出勤':'type-shukkin', '退勤':'type-taikin', '外出':'type-gaishutsu', '帰社':'type-kisha'};
   function renderDakoku(){
     var tbody = document.getElementById('dakoku-tbody');
     var filtered = DAKOKU_ROWS.filter(dMatches);
     tbody.innerHTML = '';
     filtered.forEach(function(r){
       var tr = document.createElement('tr');
+      if (DAKOKU_TYPE_CLASS[r.dakokuType]) tr.className = DAKOKU_TYPE_CLASS[r.dakokuType];
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.dakokuDateTime) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
