@@ -174,6 +174,15 @@
   .drawer-actions .stop{background:var(--field); color:var(--denied); border-color:var(--denied);}
   .drawer-actions .back{background:var(--field); color:var(--pending); border-color:var(--pending);}
 
+  /* ── 月次集計・36協定 ── */
+  td.warn-bad{color:var(--denied); font-weight:700;}
+  td.warn-caution{color:var(--pending); font-weight:700;}
+  .monthgrid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:16px;}
+  .monthgrid .mbox{background:var(--field); border:1px solid var(--line); border-radius:6px; padding:8px 10px; text-align:center;}
+  .monthgrid .mbox.current{border-color:var(--rail); background:#EAF0F4;}
+  .monthgrid .mbox .ml{font-size:10px; color:var(--dim); font-family:var(--mono);}
+  .monthgrid .mbox .mv{font-family:var(--mono); font-size:14px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;}
+
   .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:7px; font-size:12.5px; font-weight:700;
     opacity:0; pointer-events:none; transition:all .18s ease; z-index:30; font-family:var(--mono); max-width:90vw;}
@@ -311,8 +320,21 @@
         <div class="emptystate" id="dakoku-emptystate" hidden>条件に一致する打刻がありません。</div>
       </div>
     </div>
-    <div id="page-shuukei" hidden><div class="pagehead"><h1>月次集計・36協定</h1></div>
-      <div class="stub"><b>月次集計・残業・36協定</b>既存の集計シートの数値を見やすく表示する画面を予定しています。</div></div>
+    <div id="page-shuukei" hidden>
+      <div class="pagehead"><h1>月次集計・36協定</h1><span class="sub">ZANGYOU-36 / YEAR TO DATE</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="fz-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="zangyou-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="zangyou-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>氏名</th><th>雇用区分</th><th>年間残業累計</th><th>36協定年間残り</th><th>月60h超累計</th><th>当月残業</th><th>複数月平均</th></tr></thead>
+          <tbody id="zangyou-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="zangyou-emptystate" hidden>データがありません。</div>
+      </div>
+    </div>
     <div id="page-shain" hidden><div class="pagehead"><h1>社員マスタ</h1></div>
       <div class="stub"><b>社員マスタ</b>社員一覧・勤務曜日・テスト参加状況を確認できる画面を予定しています。</div></div>
   </div>
@@ -350,6 +372,20 @@
     <dt>修正理由</dt><dd><div class="reason" id="s-reason"></div></dd>
   </dl>
   <div class="drawer-actions" id="s-actions"></div>
+</div>
+
+<div class="drawer-backdrop" id="z-backdrop"></div>
+<div class="drawer" id="z-drawer" aria-hidden="true">
+  <button class="drawer-close" id="z-drawer-close">← 一覧へ戻る</button>
+  <h2 id="z-name"></h2>
+  <div class="appid" id="z-koyou"></div>
+  <dl>
+    <dt>年間残業累計</dt><dd id="z-nenkan"></dd>
+    <dt>36協定年間残り</dt><dd id="z-zan36"></dd>
+    <dt>月60h超累計</dt><dd id="z-excess60"></dd>
+    <dt>複数月平均</dt><dd id="z-heikin"></dd>
+  </dl>
+  <div class="monthgrid" id="z-months"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -577,7 +613,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
@@ -585,9 +621,10 @@
       ['shinsei','shusei','dakoku','shuukei','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
-      // 打刻ログ・修正依頼は初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
+      // 打刻ログ・修正依頼・月次集計は初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
       if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
       if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
+      if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
     });
   });
 
@@ -788,6 +825,94 @@
         SHUSEI_ROWS = data.rows || [];
         populateShuseiDropdown();
         renderShusei();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 月次集計・36協定（閲覧専用。年間残業・36協定シートをそのまま表示） ──
+  var ZANGYOU_ROWS = [];
+  var zState = { name:'' };
+  var CURRENT_MONTH_IDX = new Date().getMonth(); // 0始まり（配列インデックスと一致）
+
+  function zMatches(r){ return !zState.name || r.name === zState.name; }
+
+  function populateZangyouDropdown(){
+    var nameSel = document.getElementById('fz-name');
+    var names = Array.from(new Set(ZANGYOU_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(zState.name) !== -1 ? zState.name : '';
+    zState.name = nameSel.value;
+  }
+
+  function renderZangyou(){
+    var tbody = document.getElementById('zangyou-tbody');
+    var filtered = ZANGYOU_ROWS.filter(zMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.email = r.email;
+      // E列（36協定年間残り）50時間未満は赤、F列（月60h超累計）0超はオレンジ（GAS側の色分けと同じ基準）
+      var zan36Min = hhmmToMin_(r.zan36), excess60Min = hhmmToMin_(r.excess60);
+      var zan36Class = (zan36Min !== null && zan36Min < 50 * 60) ? 'warn-bad' : '';
+      var excessClass = (excess60Min !== null && excess60Min > 0) ? 'warn-caution' : '';
+      var curMonth = r.monthly[CURRENT_MONTH_IDX];
+      tr.innerHTML =
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.koyouKbn || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.nenkanMin || '—') + '</td>' +
+        '<td class="mono ' + zan36Class + '">' + escapeHtml(r.zan36 || '—') + '</td>' +
+        '<td class="mono ' + excessClass + '">' + escapeHtml(r.excess60 || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml((curMonth && curMonth.value) || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.heikin || '—') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('zangyou-emptystate').hidden = filtered.length > 0;
+    document.getElementById('zangyou-resultcount').textContent = filtered.length + ' 名（全' + ZANGYOU_ROWS.length + '名中）';
+  }
+
+  // "50:00"のようなhh:mm文字列を分に変換（空欄はnull）
+  function hhmmToMin_(s){
+    if (!s) return null;
+    var m = String(s).match(/^(\d+):(\d\d)$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
+  document.getElementById('fz-name').addEventListener('change', function(e){ zState.name = e.target.value; renderZangyou(); });
+  document.getElementById('zangyou-refresh').addEventListener('click', function(){ loadZangyouList(); });
+
+  var zDrawer = document.getElementById('z-drawer'), zBackdrop = document.getElementById('z-backdrop');
+  function openZangyouDrawer(email){
+    var r = ZANGYOU_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
+    document.getElementById('z-name').textContent = r.name;
+    document.getElementById('z-koyou').textContent = r.koyouKbn || '—';
+    document.getElementById('z-nenkan').textContent = r.nenkanMin || '—';
+    document.getElementById('z-zan36').textContent = r.zan36 || '—';
+    document.getElementById('z-excess60').textContent = r.excess60 || '—';
+    document.getElementById('z-heikin').textContent = r.heikin || '—';
+    document.getElementById('z-months').innerHTML = r.monthly.map(function(m, idx){
+      return '<div class="mbox' + (idx === CURRENT_MONTH_IDX ? ' current' : '') + '">' +
+        '<div class="ml">' + escapeHtml(m.label) + '</div><div class="mv">' + escapeHtml(m.value || '—') + '</div></div>';
+    }).join('');
+    zDrawer.classList.add('open'); zDrawer.setAttribute('aria-hidden','false'); zBackdrop.classList.add('open');
+  }
+  function closeZangyouDrawer(){ zDrawer.classList.remove('open'); zDrawer.setAttribute('aria-hidden','true'); zBackdrop.classList.remove('open'); }
+  document.getElementById('z-drawer-close').addEventListener('click', closeZangyouDrawer);
+  zBackdrop.addEventListener('click', closeZangyouDrawer);
+  document.getElementById('zangyou-tbody').addEventListener('click', function(e){
+    var tr = e.target.closest('tr'); if (tr) openZangyouDrawer(tr.dataset.email);
+  });
+
+  function loadZangyouList(){
+    document.getElementById('zangyou-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalZangyou36List&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
+        ZANGYOU_ROWS = data.rows || [];
+        populateZangyouDropdown();
+        renderZangyou();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
