@@ -324,6 +324,7 @@
       <button data-nav="dengon"><span class="ic">💬</span>伝言板</button>
       <button data-nav="gesshu"><span class="ic">📅</span>月次集計</button>
       <button data-nav="shuubetsu"><span class="ic">📆</span>週別実働</button>
+      <button data-nav="dakokukakunin"><span class="ic">🗓️</span>打刻確認</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -564,6 +565,22 @@
           <tbody id="shuubetsu-tbody"></tbody>
         </table>
         <div class="emptystate" id="shuubetsu-emptystate" hidden>データがありません。</div>
+      </div>
+    </div>
+    <div id="page-dakokukakunin" hidden>
+      <div class="pagehead"><h1>打刻確認</h1><span class="sub">DAKOKU-KAKUNIN / MONTHLY MATRIX（総務課確認用）</span></div>
+      <div class="filterbar">
+        <div class="f"><label>対象月</label><select id="fk-label"></select></div>
+        <div class="f grow"><label>氏名</label><select id="fk-name"><option value="">全員表示</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="dakokukakunin-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="dakokukakunin-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead id="dakokukakunin-thead"></thead>
+          <tbody id="dakokukakunin-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="dakokukakunin-emptystate" hidden>データがありません。</div>
       </div>
     </div>
     <div id="page-shain" hidden>
@@ -943,7 +960,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var shinseiLoaded = false, dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false, gesshuLoaded = false, shuubetsuLoaded = false;
+  var shinseiLoaded = false, dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false, gesshuLoaded = false, shuubetsuLoaded = false, dakokukakuninLoaded = false;
   // ジャンプ＋絞り込み（ホーム画面の一覧から該当タブを開いて氏名等で絞り込む）のため、
   // 各タブの初回読み込みのPromiseをここに保持する。既に読み込み済みのタブはresolve済みの
   // ままなので、jumpToTabは毎回.then()するだけで「未読込なら待つ・既読込なら即実行」を両立できる
@@ -952,7 +969,7 @@
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['home','shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','gesshu','shuubetsu','shain'].forEach(function(name){
+      ['home','shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','gesshu','shuubetsu','dakokukakunin','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
       // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
@@ -965,6 +982,7 @@
       if (btn.dataset.nav === 'dengon' && !dengonLoaded) { dengonLoaded = true; loadDengonList(); }
       if (btn.dataset.nav === 'gesshu' && !gesshuLoaded) { gesshuLoaded = true; loadGesshuList(); }
       if (btn.dataset.nav === 'shuubetsu' && !shuubetsuLoaded) { shuubetsuLoaded = true; loadShuubetsuList(); }
+      if (btn.dataset.nav === 'dakokukakunin' && !dakokukakuninLoaded) { dakokukakuninLoaded = true; loadDakokuKakuninList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
@@ -1833,6 +1851,88 @@
           SHUUBETSU_ROWS = data.rows || [];
           populateShuubetsuNameDropdown();
           renderShuubetsuTable();
+        })
+        .catch(function(){ showToast('通信エラーが発生しました。', true); });
+    });
+  }
+
+  // ── 打刻確認（閲覧専用。日付×社員のワイド行列をシートに近い形で再現。
+  //    警告色（残業★・申請なし系等）はGAS側が実際の背景色・文字色をそのまま返す） ──
+  var DAKOKU_KAKUNIN_DATA = { employeeNames: [], days: [] };
+  var kState = { label:'', name:'' };
+
+  function dkStyle_(bg, fc){
+    var s = 'background:' + (bg || '#ffffff') + ';';
+    if (fc) s += 'color:' + fc + ';';
+    return s;
+  }
+
+  function populateDakokuKakuninNameDropdown(){
+    var nameSel = document.getElementById('fk-name');
+    var names = (DAKOKU_KAKUNIN_DATA.employeeNames || []).slice().sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">全員表示</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(kState.name) !== -1 ? kState.name : '';
+    kState.name = nameSel.value;
+  }
+
+  function renderDakokuKakuninTable(){
+    var data = DAKOKU_KAKUNIN_DATA;
+    var allNames = data.employeeNames || [];
+    var pickedIdx = kState.name ? allNames.indexOf(kState.name) : -1;
+    var empIdxs = pickedIdx !== -1 ? [pickedIdx] : allNames.map(function(_, i){ return i; });
+
+    var thead = document.getElementById('dakokukakunin-thead');
+    thead.innerHTML =
+      '<tr><th colspan="2" rowspan="2">日付</th>' +
+        empIdxs.map(function(i){ return '<th colspan="3">' + escapeHtml(allNames[i] || '—') + '</th>'; }).join('') +
+      '</tr><tr>' +
+        empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th>備考</th>'; }).join('') +
+      '</tr>';
+    if (thead.rows.length === 2) {
+      var h = thead.rows[0].offsetHeight;
+      Array.from(thead.rows[1].cells).forEach(function(th){ th.style.top = h + 'px'; });
+    }
+
+    var tbody = document.getElementById('dakokukakunin-tbody');
+    tbody.innerHTML = '';
+    (data.days || []).forEach(function(day){
+      var tr = document.createElement('tr');
+      var dateStyle = dkStyle_(day.dateBg, day.dateFc);
+      var cells =
+        '<td class="mono" style="' + dateStyle + '">' + escapeHtml(day.date) + '</td>' +
+        '<td class="mono" style="' + dateStyle + '">' + escapeHtml(day.dow) + '</td>';
+      empIdxs.forEach(function(i){
+        var emp = day.employees[i] || {};
+        cells +=
+          '<td class="mono" style="' + dkStyle_(emp.shukkinBg, emp.shukkinFc) + '">' + escapeHtml(emp.shukkin || '—') + '</td>' +
+          '<td class="mono" style="' + dkStyle_(emp.taikinBg, emp.taikinFc) + '">' + escapeHtml(emp.taikin || '—') + '</td>' +
+          '<td style="' + dkStyle_(emp.bikoBg, emp.bikoFc) + '">' + escapeHtml(emp.biko || '') + '</td>';
+      });
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('dakokukakunin-emptystate').hidden = (data.days || []).length > 0;
+    document.getElementById('dakokukakunin-resultcount').textContent =
+      (data.days || []).length + ' 日分（' + (pickedIdx !== -1 ? '1名表示中' : '全' + allNames.length + '名') + '）';
+  }
+
+  document.getElementById('fk-name').addEventListener('change', function(e){ kState.name = e.target.value; renderDakokuKakuninTable(); });
+  document.getElementById('fk-label').addEventListener('change', function(e){ kState.label = e.target.value; loadDakokuKakuninList(); });
+  document.getElementById('dakokukakunin-refresh').addEventListener('click', function(){ loadDakokuKakuninList(); });
+
+  function loadDakokuKakuninList(){
+    document.getElementById('dakokukakunin-resultcount').textContent = '読み込み中…';
+    ensureMonthlyLabelsLoaded_(function(){
+      kState.label = populateMonthlyLabelSelect_('fk-label', kState.label);
+      if (!kState.label) { document.getElementById('dakokukakunin-resultcount').textContent = '利用可能な月がありません。'; return; }
+      fetch(GAS_URL + '?mode=portalDakokuKakuninList&token=' + encodeURIComponent(idToken) + '&label=' + encodeURIComponent(kState.label))
+        .then(function(res){ return res.json(); })
+        .then(function(data){
+          if (!data.success) { showToast(data.error || '打刻確認の取得に失敗しました。', true); return; }
+          DAKOKU_KAKUNIN_DATA = data;
+          populateDakokuKakuninNameDropdown();
+          renderDakokuKakuninTable();
         })
         .catch(function(){ showToast('通信エラーが発生しました。', true); });
     });
