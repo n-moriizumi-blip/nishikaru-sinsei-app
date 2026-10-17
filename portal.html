@@ -191,6 +191,22 @@
   .choukabadge{font-size:11px; font-weight:700; color:var(--denied); background:var(--field);
     border:1px solid var(--denied); border-radius:999px; padding:2px 9px;}
 
+  /* ── 伝言板（applyDengonbanColorと同じ配色。表示＝未確認・済＝確認済み） ── */
+  tr.dg-hyouji{border-left:4px solid #7F6000; background:#FFF2CC;}
+  tr.dg-sumi{border-left:4px solid #274E13; background:#D9EAD3;}
+  .dgbadge{font-size:11px; font-weight:700; border-radius:999px; padding:2px 9px; font-family:var(--mono);}
+  .dgbadge.hyouji{color:#7F6000; background:#fff; border:1px solid #7F6000;}
+  .dgbadge.sumi{color:#274E13; background:#fff; border:1px solid #274E13;}
+  .newbtn{font-family:var(--mono); font-size:11.5px; font-weight:700; padding:7px 12px; border-radius:5px;
+    border:1px solid var(--approved); background:var(--approved); color:#06241A; cursor:pointer;}
+  .composer-field{display:flex; flex-direction:column; gap:4px; margin-top:14px;}
+  .composer-field label{font-size:10px; font-weight:700; color:var(--dim); letter-spacing:.06em;
+    text-transform:uppercase; font-family:var(--mono);}
+  .composer-field select, .composer-field input, .composer-field textarea{background:var(--field);
+    border:1px solid var(--line); border-radius:5px; padding:9px 10px; font-size:13.5px; font-family:var(--body);
+    color:var(--ink); width:100%;}
+  .composer-field textarea{resize:vertical; min-height:90px; line-height:1.6; font-family:var(--body);}
+
   .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:7px; font-size:12.5px; font-weight:700;
     opacity:0; pointer-events:none; transition:all .18s ease; z-index:30; font-family:var(--mono); max-width:90vw;}
@@ -245,6 +261,7 @@
       <button data-nav="shuukei"><span class="ic">📊</span>36協定</button>
       <button data-nav="yukyu"><span class="ic">🏖️</span>有給管理</button>
       <button data-nav="tokubetsu"><span class="ic">🎌</span>特別休暇管理</button>
+      <button data-nav="dengon"><span class="ic">💬</span>伝言板</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -380,6 +397,24 @@
         <div class="emptystate" id="tokubetsu-emptystate" hidden>条件に一致するデータがありません。</div>
       </div>
     </div>
+    <div id="page-dengon" hidden>
+      <div class="pagehead"><h1>伝言板</h1><span class="sub">DENGONBAN / MESSAGE BOARD</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>宛先氏名</label><select id="fd-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>状況</label><select id="fd-status"><option value="">すべて</option>
+          <option value="表示">未確認</option><option value="済">確認済み</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="dengon-refresh">再読み込み</button></div>
+        <div class="f"><label>&nbsp;</label><button class="newbtn" id="dengon-new">＋ 新規作成</button></div>
+      </div>
+      <p class="resultcount" id="dengon-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>状況</th><th>宛先氏名</th><th>送信者</th><th>メッセージ内容</th><th>登録日時</th><th>確認日時</th></tr></thead>
+          <tbody id="dengon-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="dengon-emptystate" hidden>条件に一致するデータがありません。</div>
+      </div>
+    </div>
     <div id="page-shain" hidden>
       <div class="pagehead"><h1>社員マスタ</h1><span class="sub">SHAIN-MASTER / ROSTER</span></div>
       <div class="filterbar">
@@ -503,12 +538,36 @@
   </dl>
 </div>
 
+<div class="drawer-backdrop" id="dd-backdrop"></div>
+<div class="drawer" id="dd-drawer" aria-hidden="true">
+  <button class="drawer-close" id="dd-drawer-close">← 一覧へ戻る</button>
+  <h2 id="dd-name"></h2>
+  <div class="appid" id="dd-msgid"></div>
+  <dl>
+    <dt>送信者</dt><dd id="dd-sender"></dd>
+    <dt>メッセージ内容</dt><dd><div class="reason" id="dd-content"></div></dd>
+    <dt>登録日時</dt><dd id="dd-entrydate"></dd>
+    <dt>状況</dt><dd id="dd-status"></dd>
+    <dt>確認日時</dt><dd id="dd-confirmdate"></dd>
+  </dl>
+</div>
+
+<div class="drawer-backdrop" id="dc-backdrop"></div>
+<div class="drawer" id="dc-drawer" aria-hidden="true">
+  <button class="drawer-close" id="dc-drawer-close">← 一覧へ戻る</button>
+  <h2>新規作成</h2>
+  <div class="composer-field"><label>宛先氏名</label><select id="dc-name"><option value="">選択してください</option></select></div>
+  <div class="composer-field"><label>送信者</label><input type="text" id="dc-sender" placeholder="例：総務"></div>
+  <div class="composer-field"><label>メッセージ内容</label><textarea id="dc-content" placeholder="伝言の内容を入力してください"></textarea></div>
+  <div class="drawer-actions"><button class="go" id="dc-send">送信</button></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 (function(){
   var GAS_URL = 'https://script.google.com/a/macros/nishikaru.co.jp/s/AKfycbzht6wuAjcOKeiGL20sHIEE1ip10b7haJfb5lFNahg7XN-ZBKZtwhxE3sfPhydCA21xYg/exec';
-  var idToken = null, myEmail = '';
+  var idToken = null, myEmail = '', myName = '';
   var ROWS = [];
   var state = { id:'', name:'', ykbn:'', date:'', type:'', status:'' };
   var currentId = null;
@@ -728,12 +787,12 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','shain'].forEach(function(name){
+      ['shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
       // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
@@ -742,6 +801,7 @@
       if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
       if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; loadYukyuList(); }
       if (btn.dataset.nav === 'tokubetsu' && !tokubetsuLoaded) { tokubetsuLoaded = true; loadTokubetsuList(); }
+      if (btn.dataset.nav === 'dengon' && !dengonLoaded) { dengonLoaded = true; loadDengonList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
@@ -1305,12 +1365,149 @@
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
 
+  // ── 伝言板（閲覧＋新規作成） ──
+  var DENGON_ROWS = [];
+  var dgState = { name:'', status:'' };
+  var DG_STATUS_CLASS = { '表示':'dg-hyouji', '済':'dg-sumi' };
+  var DG_STATUS_LABEL = { '表示':'未確認', '済':'確認済み' };
+
+  function dgMatches(r){
+    if (dgState.status && r.showFlag !== dgState.status) return false;
+    if (dgState.name && r.name !== dgState.name) return false;
+    return true;
+  }
+
+  function populateDengonDropdown(){
+    var nameSel = document.getElementById('fd-name');
+    var names = Array.from(new Set(DENGON_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(dgState.name) !== -1 ? dgState.name : '';
+    dgState.name = nameSel.value;
+  }
+
+  function dgBadge(flag){
+    var cls = flag === '表示' ? 'hyouji' : flag === '済' ? 'sumi' : '';
+    var label = DG_STATUS_LABEL[flag] || flag || '—';
+    return cls ? '<span class="dgbadge ' + cls + '">' + escapeHtml(label) + '</span>' : escapeHtml(label);
+  }
+
+  function renderDengon(){
+    var tbody = document.getElementById('dengon-tbody');
+    var filtered = DENGON_ROWS.filter(dgMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.id = r.msgId;
+      if (DG_STATUS_CLASS[r.showFlag]) tr.className = DG_STATUS_CLASS[r.showFlag];
+      tr.innerHTML =
+        '<td>' + dgBadge(r.showFlag) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.sender || '—') + '</td>' +
+        '<td>' + escapeHtml(r.content || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.entryDate || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.confirmDate || '—') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('dengon-emptystate').hidden = filtered.length > 0;
+    document.getElementById('dengon-resultcount').textContent = filtered.length + ' 件（全' + DENGON_ROWS.length + '件中）';
+  }
+
+  document.getElementById('fd-name').addEventListener('change', function(e){ dgState.name = e.target.value; renderDengon(); });
+  document.getElementById('fd-status').addEventListener('change', function(e){ dgState.status = e.target.value; renderDengon(); });
+  document.getElementById('dengon-refresh').addEventListener('click', function(){ loadDengonList(); });
+
+  var ddDrawer = document.getElementById('dd-drawer'), ddBackdrop = document.getElementById('dd-backdrop');
+  function openDengonDetail(id){
+    var r = DENGON_ROWS.find(function(x){ return x.msgId === id; }); if (!r) return;
+    document.getElementById('dd-name').textContent = r.name;
+    document.getElementById('dd-msgid').textContent = id;
+    document.getElementById('dd-sender').textContent = r.sender || '—';
+    document.getElementById('dd-content').textContent = r.content || '（内容なし）';
+    document.getElementById('dd-entrydate').textContent = r.entryDate || '—';
+    document.getElementById('dd-status').innerHTML = dgBadge(r.showFlag);
+    document.getElementById('dd-confirmdate').textContent = r.confirmDate || '—';
+    ddDrawer.classList.add('open'); ddDrawer.setAttribute('aria-hidden','false'); ddBackdrop.classList.add('open');
+  }
+  function closeDengonDetail(){ ddDrawer.classList.remove('open'); ddDrawer.setAttribute('aria-hidden','true'); ddBackdrop.classList.remove('open'); }
+  document.getElementById('dd-drawer-close').addEventListener('click', closeDengonDetail);
+  ddBackdrop.addEventListener('click', closeDengonDetail);
+  document.getElementById('dengon-tbody').addEventListener('click', function(e){
+    var tr = e.target.closest('tr'); if (tr) openDengonDetail(tr.dataset.id);
+  });
+
+  // 新規作成フォームの宛先氏名は、伝言板に実績がある人だけでなく全社員から選べるようにする
+  // ため、社員マスタ（社員マスタタブと共通のSHAIN_ROWS）を未読み込みならここで取得する
+  function ensureShainRowsLoaded_(cb){
+    if (SHAIN_ROWS.length > 0) { cb(); return; }
+    fetch(GAS_URL + '?mode=portalShainList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){ if (data.success) SHAIN_ROWS = data.rows || []; cb(); })
+      .catch(function(){ cb(); });
+  }
+
+  var dcDrawer = document.getElementById('dc-drawer'), dcBackdrop = document.getElementById('dc-backdrop');
+  function openDengonComposer(){
+    var sel = document.getElementById('dc-name');
+    sel.innerHTML = '<option value="">読み込み中…</option>';
+    ensureShainRowsLoaded_(function(){
+      var names = SHAIN_ROWS.map(function(r){ return r.name; }).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+      sel.innerHTML = '<option value="">選択してください</option>' +
+        names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    });
+    document.getElementById('dc-sender').value = myName || '';
+    document.getElementById('dc-content').value = '';
+    dcDrawer.classList.add('open'); dcDrawer.setAttribute('aria-hidden','false'); dcBackdrop.classList.add('open');
+  }
+  function closeDengonComposer(){ dcDrawer.classList.remove('open'); dcDrawer.setAttribute('aria-hidden','true'); dcBackdrop.classList.remove('open'); }
+  document.getElementById('dengon-new').addEventListener('click', openDengonComposer);
+  document.getElementById('dc-drawer-close').addEventListener('click', closeDengonComposer);
+  dcBackdrop.addEventListener('click', closeDengonComposer);
+
+  var dgSending = false;
+  document.getElementById('dc-send').addEventListener('click', function(){
+    if (dgSending) return;
+    var name    = document.getElementById('dc-name').value;
+    var sender  = document.getElementById('dc-sender').value.trim();
+    var content = document.getElementById('dc-content').value.trim();
+    if (!name || !sender || !content) { showToast('宛先・送信者・メッセージ内容は必須です。', true); return; }
+    dgSending = true;
+    var btn = document.getElementById('dc-send'); btn.disabled = true;
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'createDengon', token: idToken, name: name, sender: sender, content: content })
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        dgSending = false; btn.disabled = false;
+        if (!data.success) { showToast(data.message || '送信に失敗しました。', true); return; }
+        showToast('伝言を送信しました：' + name);
+        closeDengonComposer();
+        loadDengonList();
+      })
+      .catch(function(){ dgSending = false; btn.disabled = false; showToast('通信エラーが発生しました。', true); });
+  });
+
+  function loadDengonList(){
+    document.getElementById('dengon-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalDengonList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
+        DENGON_ROWS = data.rows || [];
+        populateDengonDropdown();
+        renderDengon();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
   // ── Googleログイン ──
   window.handleCredentialResponse = function(response){
     idToken = response.credential;
     try {
       var payload = JSON.parse(base64UrlDecode_(idToken.split('.')[1]));
       myEmail = payload.email;
+      myName  = payload.name || '';
     } catch (e) {}
 
     document.getElementById('loadingNote').style.display = 'block';
