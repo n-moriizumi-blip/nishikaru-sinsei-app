@@ -335,8 +335,23 @@
         <div class="emptystate" id="zangyou-emptystate" hidden>データがありません。</div>
       </div>
     </div>
-    <div id="page-shain" hidden><div class="pagehead"><h1>社員マスタ</h1></div>
-      <div class="stub"><b>社員マスタ</b>社員一覧・勤務曜日・テスト参加状況を確認できる画面を予定しています。</div></div>
+    <div id="page-shain" hidden>
+      <div class="pagehead"><h1>社員マスタ</h1><span class="sub">SHAIN-MASTER / ROSTER</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="fm-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>雇用区分</label><select id="fm-koyou"><option value="">すべて</option>
+          <option>正社員</option><option>パート</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="shain-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="shain-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>氏名</th><th>雇用区分</th><th>定時</th><th>入社日</th><th>勤務曜日</th><th>テスト参加</th><th>備考</th></tr></thead>
+          <tbody id="shain-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="shain-emptystate" hidden>条件に一致する社員がいません。</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -386,6 +401,24 @@
     <dt>複数月平均</dt><dd id="z-heikin"></dd>
   </dl>
   <div class="monthgrid" id="z-months"></div>
+</div>
+
+<div class="drawer-backdrop" id="m-backdrop"></div>
+<div class="drawer" id="m-drawer" aria-hidden="true">
+  <button class="drawer-close" id="m-drawer-close">← 一覧へ戻る</button>
+  <h2 id="m-name"></h2>
+  <div class="appid" id="m-furigana"></div>
+  <dl>
+    <dt>メールアドレス</dt><dd id="m-email"></dd>
+    <dt>雇用区分</dt><dd id="m-koyou"></dd>
+    <dt>定時</dt><dd id="m-teiji"></dd>
+    <dt>入社日</dt><dd id="m-nyusha"></dd>
+    <dt>勤務曜日</dt><dd id="m-workdays"></dd>
+    <dt>独自ルール対象</dt><dd id="m-dokuji"></dd>
+    <dt>テスト参加</dt><dd id="m-testsanka"></dd>
+    <dt>NFCタグID</dt><dd id="m-nfc"></dd>
+    <dt>備考</dt><dd><div class="reason" id="m-biko"></div></dd>
+  </dl>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -613,7 +646,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
@@ -621,10 +654,11 @@
       ['shinsei','shusei','dakoku','shuukei','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
-      // 打刻ログ・修正依頼・月次集計は初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
+      // 打刻ログ・修正依頼・36協定・社員マスタは初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
       if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
       if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
       if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
+      if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
 
@@ -934,6 +968,86 @@
         ZANGYOU_ROWS = data.rows || [];
         populateZangyouDropdown();
         renderZangyou();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 社員マスタ（閲覧専用。Webhook URL等の機密情報はサーバー側で除外済み） ──
+  var SHAIN_ROWS = [];
+  var mState = { name:'', koyou:'' };
+
+  function mMatches(r){
+    if (mState.koyou && r.koyouKbn !== mState.koyou) return false;
+    if (mState.name && r.name !== mState.name) return false;
+    return true;
+  }
+
+  function populateShainDropdown(){
+    var nameSel = document.getElementById('fm-name');
+    var names = Array.from(new Set(SHAIN_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(mState.name) !== -1 ? mState.name : '';
+    mState.name = nameSel.value;
+  }
+
+  function renderShain(){
+    var tbody = document.getElementById('shain-tbody');
+    var filtered = SHAIN_ROWS.filter(mMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.email = r.email;
+      tr.innerHTML =
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.koyouKbn || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.teijiStart || '—') + '〜' + escapeHtml(r.teijiEnd || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.nyushaDate || '—') + '</td>' +
+        '<td>' + escapeHtml(r.workDays || '毎平日') + '</td>' +
+        '<td>' + (r.isTestSanka ? '対象' : '—') + '</td>' +
+        '<td>' + escapeHtml(r.biko || '') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('shain-emptystate').hidden = filtered.length > 0;
+    document.getElementById('shain-resultcount').textContent = filtered.length + ' 名（全' + SHAIN_ROWS.length + '名中）';
+  }
+
+  document.getElementById('fm-name').addEventListener('change', function(e){ mState.name = e.target.value; renderShain(); });
+  document.getElementById('fm-koyou').addEventListener('change', function(e){ mState.koyou = e.target.value; renderShain(); });
+  document.getElementById('shain-refresh').addEventListener('click', function(){ loadShainList(); });
+
+  var mDrawer = document.getElementById('m-drawer'), mBackdrop = document.getElementById('m-backdrop');
+  function openShainDrawer(email){
+    var r = SHAIN_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
+    document.getElementById('m-name').textContent = r.name;
+    document.getElementById('m-furigana').textContent = r.furigana || '—';
+    document.getElementById('m-email').textContent = r.email;
+    document.getElementById('m-koyou').textContent = r.koyouKbn || '—';
+    document.getElementById('m-teiji').textContent = (r.teijiStart || '—') + '〜' + (r.teijiEnd || '—');
+    document.getElementById('m-nyusha').textContent = r.nyushaDate || '—';
+    document.getElementById('m-workdays').textContent = r.workDays || '毎平日';
+    document.getElementById('m-dokuji').textContent = r.isDokujirule ? '対象' : '対象外';
+    document.getElementById('m-testsanka').textContent = r.isTestSanka ? '対象' : '対象外';
+    document.getElementById('m-nfc').textContent = r.nfcId || '—';
+    document.getElementById('m-biko').textContent = r.biko || '（記入なし）';
+    mDrawer.classList.add('open'); mDrawer.setAttribute('aria-hidden','false'); mBackdrop.classList.add('open');
+  }
+  function closeShainDrawer(){ mDrawer.classList.remove('open'); mDrawer.setAttribute('aria-hidden','true'); mBackdrop.classList.remove('open'); }
+  document.getElementById('m-drawer-close').addEventListener('click', closeShainDrawer);
+  mBackdrop.addEventListener('click', closeShainDrawer);
+  document.getElementById('shain-tbody').addEventListener('click', function(e){
+    var tr = e.target.closest('tr'); if (tr) openShainDrawer(tr.dataset.email);
+  });
+
+  function loadShainList(){
+    document.getElementById('shain-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalShainList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || '社員マスタの取得に失敗しました。', true); return; }
+        SHAIN_ROWS = data.rows || [];
+        populateShainDropdown();
+        renderShain();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
