@@ -235,6 +235,7 @@
       <button data-nav="shusei"><span class="ic">🛠️</span>修正依頼</button>
       <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
       <button data-nav="shuukei"><span class="ic">📊</span>36協定</button>
+      <button data-nav="yukyu"><span class="ic">🏖️</span>有給管理</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -335,6 +336,22 @@
         <div class="emptystate" id="zangyou-emptystate" hidden>データがありません。</div>
       </div>
     </div>
+
+    <div id="page-yukyu" hidden>
+      <div class="pagehead"><h1>有給管理</h1><span class="sub">YUKYU-KANRI / LEAVE BALANCE</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="fy-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="yukyu-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="yukyu-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>氏名</th><th>勤続年数</th><th>今年度付与日数</th><th>通常有給残日数</th><th>消化済み日数</th><th>積立有給残日数</th><th>積立有給消化日数</th></tr></thead>
+          <tbody id="yukyu-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="yukyu-emptystate" hidden>データがありません。</div>
+      </div>
+    </div>
     <div id="page-shain" hidden>
       <div class="pagehead"><h1>社員マスタ</h1><span class="sub">SHAIN-MASTER / ROSTER</span></div>
       <div class="filterbar">
@@ -418,6 +435,24 @@
     <dt>テスト参加</dt><dd id="m-testsanka"></dd>
     <dt>NFCタグID</dt><dd id="m-nfc"></dd>
     <dt>備考</dt><dd><div class="reason" id="m-biko"></div></dd>
+  </dl>
+</div>
+
+<div class="drawer-backdrop" id="y-backdrop"></div>
+<div class="drawer" id="y-drawer" aria-hidden="true">
+  <button class="drawer-close" id="y-drawer-close">← 一覧へ戻る</button>
+  <h2 id="y-name"></h2>
+  <div class="appid" id="y-kinzoku"></div>
+  <dl>
+    <dt>今年度付与日数</dt><dd id="y-fuyo"></dd>
+    <dt>前年度付与日数</dt><dd id="y-fuyozen"></dd>
+    <dt>前年繰越</dt><dd id="y-kurikoshi"></dd>
+    <dt>消化済み日数</dt><dd id="y-shoka"></dd>
+    <dt>通常有給残日数</dt><dd id="y-zanzan"></dd>
+    <dt>積立有給繰越残</dt><dd id="y-tkurikoshi"></dd>
+    <dt>今年度積立移行</dt><dd id="y-tido"></dd>
+    <dt>積立有給消化日数</dt><dd id="y-tshoka"></dd>
+    <dt>積立有給残日数</dt><dd id="y-tzan"></dd>
   </dl>
 </div>
 
@@ -646,18 +681,19 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['shinsei','shusei','dakoku','shuukei','shain'].forEach(function(name){
+      ['shinsei','shusei','dakoku','shuukei','yukyu','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
-      // 打刻ログ・修正依頼・36協定・社員マスタは初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
+      // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
       if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
       if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
       if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
+      if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; loadYukyuList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
@@ -1048,6 +1084,85 @@
         SHAIN_ROWS = data.rows || [];
         populateShainDropdown();
         renderShain();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 有給管理（閲覧専用） ──
+  var YUKYU_ROWS = [];
+  var yState = { name:'' };
+
+  function yMatches(r){ return !yState.name || r.name === yState.name; }
+
+  function populateYukyuDropdown(){
+    var nameSel = document.getElementById('fy-name');
+    var names = Array.from(new Set(YUKYU_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(yState.name) !== -1 ? yState.name : '';
+    yState.name = nameSel.value;
+  }
+
+  function fmtDay_(n){ return (Math.round(n * 10) / 10) + '日'; }
+
+  function renderYukyu(){
+    var tbody = document.getElementById('yukyu-tbody');
+    var filtered = YUKYU_ROWS.filter(yMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.email = r.email;
+      // 通常有給残日数5日未満は赤（ホームシート「③有給残日数が少ない社員」と同じ基準）
+      var zanzanClass = r.zanzanNissu < 5 ? 'warn-bad' : '';
+      tr.innerHTML =
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td class="mono">' + (Math.round(r.kinzokuNen * 10) / 10) + '年</td>' +
+        '<td class="mono">' + fmtDay_(r.fuyoNissu) + '</td>' +
+        '<td class="mono ' + zanzanClass + '">' + fmtDay_(r.zanzanNissu) + '</td>' +
+        '<td class="mono">' + fmtDay_(r.shokaNissu) + '</td>' +
+        '<td class="mono">' + fmtDay_(r.tsumitateZan) + '</td>' +
+        '<td class="mono">' + fmtDay_(r.tsumitateShoka) + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('yukyu-emptystate').hidden = filtered.length > 0;
+    document.getElementById('yukyu-resultcount').textContent = filtered.length + ' 名（全' + YUKYU_ROWS.length + '名中）';
+  }
+
+  document.getElementById('fy-name').addEventListener('change', function(e){ yState.name = e.target.value; renderYukyu(); });
+  document.getElementById('yukyu-refresh').addEventListener('click', function(){ loadYukyuList(); });
+
+  var yDrawer = document.getElementById('y-drawer'), yBackdrop = document.getElementById('y-backdrop');
+  function openYukyuDrawer(email){
+    var r = YUKYU_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
+    document.getElementById('y-name').textContent = r.name;
+    document.getElementById('y-kinzoku').textContent = '勤続' + (Math.round(r.kinzokuNen * 10) / 10) + '年';
+    document.getElementById('y-fuyo').textContent = fmtDay_(r.fuyoNissu);
+    document.getElementById('y-fuyozen').textContent = fmtDay_(r.fuyoZennen);
+    document.getElementById('y-kurikoshi').textContent = fmtDay_(r.kurikoshi);
+    document.getElementById('y-shoka').textContent = fmtDay_(r.shokaNissu);
+    document.getElementById('y-zanzan').textContent = fmtDay_(r.zanzanNissu);
+    document.getElementById('y-tkurikoshi').textContent = fmtDay_(r.tsumitateKurikoshi);
+    document.getElementById('y-tido').textContent = fmtDay_(r.tsumitateIdo);
+    document.getElementById('y-tshoka').textContent = fmtDay_(r.tsumitateShoka);
+    document.getElementById('y-tzan').textContent = fmtDay_(r.tsumitateZan);
+    yDrawer.classList.add('open'); yDrawer.setAttribute('aria-hidden','false'); yBackdrop.classList.add('open');
+  }
+  function closeYukyuDrawer(){ yDrawer.classList.remove('open'); yDrawer.setAttribute('aria-hidden','true'); yBackdrop.classList.remove('open'); }
+  document.getElementById('y-drawer-close').addEventListener('click', closeYukyuDrawer);
+  yBackdrop.addEventListener('click', closeYukyuDrawer);
+  document.getElementById('yukyu-tbody').addEventListener('click', function(e){
+    var tr = e.target.closest('tr'); if (tr) openYukyuDrawer(tr.dataset.email);
+  });
+
+  function loadYukyuList(){
+    document.getElementById('yukyu-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalYukyuList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
+        YUKYU_ROWS = data.rows || [];
+        populateYukyuDropdown();
+        renderYukyu();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
