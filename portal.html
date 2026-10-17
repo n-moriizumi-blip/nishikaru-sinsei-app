@@ -579,10 +579,15 @@
     });
   }
 
+  // IDトークンの中身はUTF-8。atob()は1バイトずつ文字にするだけなので、そのままだと
+  // 日本語の名前が「æ£®æ³…」のように化ける（2026-10-17、伝言板の送信者欄で発覚）。UTF-8として読み直す
   function base64UrlDecode_(str){
     var base64 = str.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
-    return atob(base64);
+    var bin = atob(base64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
   }
 
   var STAMP = {'承認待':['pending','待'], '仮承認':['provisional','仮'], '承認済':['approved','済'], '否認':['denied','否']};
