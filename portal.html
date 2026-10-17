@@ -113,11 +113,13 @@
   table{width:100%; border-collapse:collapse; font-size:13px;}
   thead th{text-align:left; font-size:10px; font-weight:700; color:var(--rail-ink); padding:10px 12px; letter-spacing:.07em;
     text-transform:uppercase; font-family:var(--mono); border-bottom:1.5px solid #16293A; background:var(--rail);
-    white-space:nowrap; position:sticky; top:0; z-index:2;}
+    white-space:nowrap; position:sticky; top:0; z-index:2; border-right:1px solid rgba(255,255,255,.14);}
+  thead th:last-child{border-right:none;}
   tbody tr{border-bottom:1px solid var(--line); cursor:pointer;}
   tbody tr:last-child{border-bottom:none;}
   tbody tr:hover{background:var(--bg);}
-  td{padding:10px 12px; vertical-align:middle;}
+  td{padding:10px 12px; vertical-align:middle; border-right:1px solid var(--line);}
+  td:last-child{border-right:none;}
   td.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--dim); font-size:12.5px;}
   td.name{font-weight:700; color:var(--ink);}
   .emptystate{padding:40px 20px; text-align:center; color:var(--dim); font-size:13px;}
