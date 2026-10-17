@@ -223,7 +223,7 @@
   .homestamp.c-shusei .circle{border:3px solid var(--denied); color:var(--denied); transform:rotate(-6deg);}
 
   .homerow{display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; margin-bottom:20px;}
-  .homecol-main{flex:2 1 560px; min-width:0;}
+  .homecol-main{flex:2 1 560px; min-width:0; display:flex; flex-direction:column; gap:20px;}
   .homecol-side{flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:20px;}
 
   .homecard-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; flex-wrap:wrap; gap:8px;}
@@ -344,9 +344,25 @@
             </table>
             <div class="emptystate" id="home-pending-empty" hidden>該当する申請はありません。</div>
           </div>
+
+          <div class="sheet" id="home-nashi-card">
+            <div class="homecard-head navy">
+              <div class="ti">📢「休暇・遅刻・早退申請なし」</div>
+              <div class="periodbadges" id="home-nashi-badges"></div>
+            </div>
+            <table>
+              <thead><tr><th>日付</th><th>氏名</th><th>内容</th><th>解消済み</th></tr></thead>
+              <tbody id="home-nashi-tbody"></tbody>
+            </table>
+            <div class="emptystate" id="home-nashi-empty" hidden>該当者はいません。</div>
+          </div>
         </div>
 
         <div class="homecol-side">
+          <div class="sheet">
+            <div class="homecard-head red"><div class="ti">🔧 打刻ミス（修正依頼）</div></div>
+            <div class="homelist" id="home-shusei-list"></div>
+          </div>
           <div class="sheet">
             <div class="homecard-head teal"><div class="ti">🏖️ 有給残日数が少ない社員（5日未満）</div></div>
             <div class="homelist" id="home-yukyu-list"></div>
@@ -355,23 +371,7 @@
             <div class="homecard-head gold"><div class="ti">⏰ 残業warning（45h/60h超）</div></div>
             <div class="homelist" id="home-zangyou-list"></div>
           </div>
-          <div class="sheet">
-            <div class="homecard-head red"><div class="ti">🔧 打刻ミス（修正依頼）</div></div>
-            <div class="homelist" id="home-shusei-list"></div>
-          </div>
         </div>
-      </div>
-
-      <div class="sheet" id="home-nashi-card">
-        <div class="homecard-head navy">
-          <div class="ti">📢「休暇・遅刻・早退申請なし」</div>
-          <div class="periodbadges" id="home-nashi-badges"></div>
-        </div>
-        <table>
-          <thead><tr><th>日付</th><th>氏名</th><th>内容</th><th>解消済み</th></tr></thead>
-          <tbody id="home-nashi-tbody"></tbody>
-        </table>
-        <div class="emptystate" id="home-nashi-empty" hidden>該当者はいません。</div>
       </div>
 
       <div class="homefooter">💡 一覧の行をクリックすると、該当タブが開き、その人で絞り込まれます。</div>
@@ -1738,14 +1738,14 @@
     var items = [
       { cls:'c-pending', count: data.pending.current.length, label:'承認待ち', hint:'申請一覧へ',
         onClick: function(){ jumpToTab('shinsei', '', { status: '承認待' }); } },
-      { cls:'c-warn', count: data.zangyou.length, label:'残業warning', hint:'36協定へ',
-        onClick: function(){ jumpToTab('shuukei', ''); } },
-      { cls:'c-yukyu', count: data.yukyuLow.length, label:'有給残少ない', hint:'有給管理へ',
-        onClick: function(){ jumpToTab('yukyu', ''); } },
       { cls:'c-nashi', count: data.nashi.current.length, label:'申請なし', hint:'下の一覧へ',
         onClick: function(){ document.getElementById('home-nashi-card').scrollIntoView({ behavior:'smooth', block:'start' }); } },
       { cls:'c-shusei', count: data.shusei.length, label:'打刻ミス', hint:'修正依頼へ',
         onClick: function(){ jumpToTab('shusei', ''); } },
+      { cls:'c-warn', count: data.zangyou.length, label:'残業warning', hint:'36協定へ',
+        onClick: function(){ jumpToTab('shuukei', ''); } },
+      { cls:'c-yukyu', count: data.yukyuLow.length, label:'有給残少ない', hint:'有給管理へ',
+        onClick: function(){ jumpToTab('yukyu', ''); } },
     ];
     items.forEach(function(it){
       var a = document.createElement('a');
