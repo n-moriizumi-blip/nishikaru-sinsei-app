@@ -207,6 +207,57 @@
     color:var(--ink); width:100%;}
   .composer-field textarea{resize:vertical; min-height:90px; line-height:1.6; font-family:var(--body);}
 
+  /* ── ホーム ── */
+  .sheetlink{font-family:var(--mono); font-size:12px; font-weight:700; color:var(--rail);}
+  .homestamps{display:flex; gap:28px; flex-wrap:wrap; padding:4px 0 20px;}
+  .homestamp{display:flex; flex-direction:column; align-items:center; gap:8px; text-decoration:none; cursor:pointer;
+    border:none; background:none; font:inherit; padding:0;}
+  .homestamp .circle{width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:var(--stamp); font-weight:700; font-size:22px; background:var(--panel);}
+  .homestamp .label{font-size:12px; font-weight:700; color:var(--ink); text-align:center; line-height:1.5;}
+  .homestamp .label small{display:block; font-size:10.5px; color:var(--dim); font-weight:400;}
+  .homestamp.c-pending .circle{border:3px solid var(--pending); color:var(--pending); transform:rotate(-5deg);}
+  .homestamp.c-warn .circle{border:3px solid var(--rail-accent); color:var(--rail-accent); transform:rotate(4deg);}
+  .homestamp.c-yukyu .circle{border:3px solid var(--provisional); color:var(--provisional); transform:rotate(-3deg);}
+  .homestamp.c-nashi .circle{border:3px solid var(--denied); color:var(--denied); transform:rotate(6deg);}
+  .homestamp.c-shusei .circle{border:3px solid var(--denied); color:var(--denied); transform:rotate(-6deg);}
+
+  .homerow{display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; margin-bottom:20px;}
+  .homecol-main{flex:2 1 560px; min-width:0;}
+  .homecol-side{flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:20px;}
+
+  .homecard-head{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; flex-wrap:wrap; gap:8px;}
+  .homecard-head .ti{font-family:var(--display); font-weight:900; font-size:13px;}
+  .homecard-head.navy{background:var(--rail);} .homecard-head.navy .ti{color:var(--rail-ink);}
+  .homecard-head.teal{background:var(--provisional);} .homecard-head.teal .ti{color:#fff;}
+  .homecard-head.gold{background:var(--rail-accent);} .homecard-head.gold .ti{color:var(--ink);}
+  .homecard-head.red{background:var(--denied);} .homecard-head.red .ti{color:#fff;}
+
+  .periodbadges{display:flex; gap:6px;}
+  .periodbadge{font-family:var(--mono); font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:999px;
+    border:none; cursor:pointer;}
+  .periodbadge.cur{background:var(--rail-ink); color:var(--rail);}
+  .periodbadge.prev{background:var(--rail-field); color:var(--rail-dim);}
+
+  .homelist .row{display:flex; justify-content:space-between; align-items:center; padding:9px 14px;
+    border-bottom:1px solid var(--line); cursor:pointer; gap:10px;}
+  .homelist .row:last-child{border-bottom:none;}
+  .homelist .row:hover{background:var(--bg);}
+  .homelist .row .n{font-weight:700; color:var(--ink); min-width:0;}
+  .homelist .row .v{font-family:var(--mono); white-space:nowrap; display:flex; align-items:center; gap:8px;}
+  .homelist .emptyrow{padding:14px 16px; color:var(--dim); font-size:12.5px;}
+
+  .levelbadge{font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; color:#fff;}
+  .levelbadge.l60{background:var(--denied);}
+  .levelbadge.l45{background:var(--pending);}
+
+  .resolvedbadge{font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; border:1px solid;}
+  .resolvedbadge.mi{background:#FBEAEA; color:var(--denied); border-color:var(--denied);}
+  .resolvedbadge.sumi{background:#EAF3EC; color:var(--approved); border-color:var(--approved);}
+
+  .homearrow{color:var(--dim); font-weight:700; text-decoration:none;}
+  .homefooter{font-size:12px; color:var(--dim); padding:10px 2px 0; border-top:1px dashed var(--line); margin-top:4px;}
+
   .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:7px; font-size:12.5px; font-weight:700;
     opacity:0; pointer-events:none; transition:all .18s ease; z-index:30; font-family:var(--mono); max-width:90vw;}
@@ -255,7 +306,8 @@
   <div class="rail"><div class="rail-inner">
     <div class="brand"><div class="mark">西</div><div class="tx">勤怠管理<br>ポータル<small>西軽精機・総務課</small></div></div>
     <nav>
-      <button class="active" data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
+      <button class="active" data-nav="home"><span class="ic">🏠</span>ホーム</button>
+      <button data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
       <button data-nav="shusei"><span class="ic">🛠️</span>修正依頼</button>
       <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
       <button data-nav="shuukei"><span class="ic">📊</span>36協定</button>
@@ -268,7 +320,64 @@
   </div></div>
 
   <div class="main">
-    <div id="page-shinsei">
+    <div id="page-home">
+      <div class="pagehead">
+        <h1>🏠 ホーム</h1>
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <a class="sheetlink" id="home-sheetlink" href="#" target="_blank" rel="noopener">📊 勤怠管理スプレッドシートを開く</a>
+          <span class="sub" id="home-period">対象期間：読み込み中…</span>
+        </div>
+      </div>
+
+      <div class="homestamps" id="home-stamps"></div>
+
+      <div class="homerow">
+        <div class="homecol-main">
+          <div class="sheet">
+            <div class="homecard-head navy">
+              <div class="ti">📋 承認待ち一覧</div>
+              <div class="periodbadges" id="home-pending-badges"></div>
+            </div>
+            <table>
+              <thead><tr><th>氏名</th><th>申請種別</th><th>対象日</th><th style="width:28px;"></th></tr></thead>
+              <tbody id="home-pending-tbody"></tbody>
+            </table>
+            <div class="emptystate" id="home-pending-empty" hidden>該当する申請はありません。</div>
+          </div>
+        </div>
+
+        <div class="homecol-side">
+          <div class="sheet">
+            <div class="homecard-head teal"><div class="ti">🏖️ 有給残日数が少ない社員（5日未満）</div></div>
+            <div class="homelist" id="home-yukyu-list"></div>
+          </div>
+          <div class="sheet">
+            <div class="homecard-head gold"><div class="ti">⏰ 残業warning（45h/60h超）</div></div>
+            <div class="homelist" id="home-zangyou-list"></div>
+          </div>
+          <div class="sheet">
+            <div class="homecard-head red"><div class="ti">🔧 打刻ミス（修正依頼）</div></div>
+            <div class="homelist" id="home-shusei-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet" id="home-nashi-card">
+        <div class="homecard-head navy">
+          <div class="ti">📢「休暇・遅刻・早退申請なし」</div>
+          <div class="periodbadges" id="home-nashi-badges"></div>
+        </div>
+        <table>
+          <thead><tr><th>日付</th><th>氏名</th><th>内容</th><th>解消済み</th></tr></thead>
+          <tbody id="home-nashi-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="home-nashi-empty" hidden>該当者はいません。</div>
+      </div>
+
+      <div class="homefooter">💡 一覧の行をクリックすると、該当タブが開き、その人で絞り込まれます。</div>
+    </div>
+
+    <div id="page-shinsei" hidden>
       <div class="pagehead"><h1>申請一覧</h1><span class="sub">SHINSEI-KANRI / LIVE QUEUE</span></div>
 
       <div class="filterbar">
@@ -792,28 +901,65 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false;
+  var shinseiLoaded = false, dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false, dengonLoaded = false;
+  // ジャンプ＋絞り込み（ホーム画面の一覧から該当タブを開いて氏名等で絞り込む）のため、
+  // 各タブの初回読み込みのPromiseをここに保持する。既に読み込み済みのタブはresolve済みの
+  // ままなので、jumpToTabは毎回.then()するだけで「未読込なら待つ・既読込なら即実行」を両立できる
+  var tabReady = {};
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','shain'].forEach(function(name){
+      ['home','shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','dengon','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
       // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
-      if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
-      if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
-      if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
-      if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; loadYukyuList(); }
+      if (btn.dataset.nav === 'shinsei' && !shinseiLoaded) { shinseiLoaded = true; tabReady.shinsei = loadShinseiList(); }
+      if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; tabReady.dakoku = loadDakokuList(); }
+      if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; tabReady.shusei = loadShuuseiList(); }
+      if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; tabReady.shuukei = loadZangyouList(); }
+      if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; tabReady.yukyu = loadYukyuList(); }
       if (btn.dataset.nav === 'tokubetsu' && !tokubetsuLoaded) { tokubetsuLoaded = true; loadTokubetsuList(); }
       if (btn.dataset.nav === 'dengon' && !dengonLoaded) { dengonLoaded = true; loadDengonList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
 
+  // ホーム画面の一覧から該当タブへ移動し、氏名（・状況）で絞り込む
+  function jumpToTab(tab, name, opts){
+    opts = opts || {};
+    var btn = document.querySelector('.rail nav button[data-nav="' + tab + '"]');
+    if (btn) btn.click();
+    var ready = tabReady[tab];
+    (ready || Promise.resolve()).then(function(){ applyJumpFilter(tab, name || '', opts); });
+  }
+
+  function applyJumpFilter(tab, name, opts){
+    if (tab === 'shinsei') {
+      state.name = name;
+      if (opts.status !== undefined) {
+        state.status = opts.status;
+        document.querySelectorAll('#f-status .pill').forEach(function(b){
+          b.setAttribute('aria-pressed', b.dataset.status === opts.status ? 'true' : 'false');
+        });
+      }
+      populateFilterDropdowns(); render();
+    } else if (tab === 'shusei') {
+      sState.name = name; populateShuseiDropdown(); renderShusei();
+    } else if (tab === 'dakoku') {
+      dState.name = name;
+      if (opts.date) { dState.date = opts.date; document.getElementById('fd-date').value = opts.date; }
+      populateDakokuDropdown(); renderDakoku();
+    } else if (tab === 'shuukei') {
+      zState.name = name; populateZangyouDropdown(); renderZangyou();
+    } else if (tab === 'yukyu') {
+      yState.name = name; populateYukyuDropdown(); renderYukyu();
+    }
+  }
+
   function loadShinseiList(){
     document.getElementById('resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalShinseiList&token=' + encodeURIComponent(idToken))
+    return fetch(GAS_URL + '?mode=portalShinseiList&token=' + encodeURIComponent(idToken))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '一覧の取得に失敗しました。', true); return; }
@@ -875,7 +1021,7 @@
 
   function loadDakokuList(){
     document.getElementById('dakoku-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalDakokuList&token=' + encodeURIComponent(idToken))
+    return fetch(GAS_URL + '?mode=portalDakokuList&token=' + encodeURIComponent(idToken))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '打刻ログの取得に失敗しました。', true); return; }
@@ -1001,7 +1147,7 @@
 
   function loadShuuseiList(){
     document.getElementById('shusei-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalShuuseiList&token=' + encodeURIComponent(idToken))
+    return fetch(GAS_URL + '?mode=portalShuuseiList&token=' + encodeURIComponent(idToken))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '修正依頼一覧の取得に失敗しました。', true); return; }
@@ -1110,7 +1256,7 @@
 
   function loadZangyouList(){
     document.getElementById('zangyou-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalZangyou36List&token=' + encodeURIComponent(idToken))
+    return fetch(GAS_URL + '?mode=portalZangyou36List&token=' + encodeURIComponent(idToken))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1271,7 +1417,7 @@
 
   function loadYukyuList(){
     document.getElementById('yukyu-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalYukyuList&token=' + encodeURIComponent(idToken))
+    return fetch(GAS_URL + '?mode=portalYukyuList&token=' + encodeURIComponent(idToken))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1506,6 +1652,144 @@
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
 
+  // ── ホーム（ダッシュボード） ──
+  var homeData = null;
+  var homePendingView = 'cur', homeNashiView = 'cur';
+
+  function homeRow(nameHtml, rightHtml, onClick){
+    var div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = '<span class="n">' + nameHtml + '</span><span class="v">' + rightHtml + '</span>';
+    div.addEventListener('click', onClick);
+    return div;
+  }
+
+  function renderHomeList(containerId, rows, emptyMsg, buildRight, onRowClick){
+    var el = document.getElementById(containerId);
+    el.innerHTML = '';
+    if (!rows.length) { el.innerHTML = '<div class="emptyrow">' + escapeHtml(emptyMsg) + '</div>'; return; }
+    rows.forEach(function(r){
+      el.appendChild(homeRow(escapeHtml(r.name), buildRight(r), function(){ onRowClick(r); }));
+    });
+  }
+
+  function renderHomePendingTable(rows){
+    var tbody = document.getElementById('home-pending-tbody');
+    tbody.innerHTML = '';
+    rows.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.shinsei) + '</td>' +
+        '<td class="mono">' + escapeHtml(r.taishouDate) + '</td>' +
+        '<td><span class="homearrow">→</span></td>';
+      tr.addEventListener('click', function(){ jumpToTab('shinsei', r.name, { status: '承認待' }); });
+      tbody.appendChild(tr);
+    });
+    document.getElementById('home-pending-empty').hidden = rows.length > 0;
+  }
+
+  function refreshPendingSection(){
+    var cur = homeData.pending.current, prev = homeData.pending.prev;
+    renderHomePendingTable(homePendingView === 'cur' ? cur : prev);
+    var el = document.getElementById('home-pending-badges');
+    el.innerHTML =
+      '<button class="periodbadge ' + (homePendingView === 'cur' ? 'cur' : 'prev') + '" data-view="cur">今期間・' + cur.length + '件</button>' +
+      '<button class="periodbadge ' + (homePendingView === 'prev' ? 'cur' : 'prev') + '" data-view="prev">前期間・' + prev.length + '件</button>';
+    Array.from(el.querySelectorAll('button')).forEach(function(btn){
+      btn.addEventListener('click', function(){ homePendingView = btn.dataset.view; refreshPendingSection(); });
+    });
+  }
+
+  function renderHomeNashiTable(rows){
+    var tbody = document.getElementById('home-nashi-tbody');
+    tbody.innerHTML = '';
+    rows.forEach(function(r){
+      var tr = document.createElement('tr');
+      var badge = r.resolved === '済'
+        ? '<span class="resolvedbadge sumi">済</span>'
+        : '<span class="resolvedbadge mi">未</span>';
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r.dateStr) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.content) + '</td>' +
+        '<td>' + badge + '</td>';
+      tr.addEventListener('click', function(){ jumpToTab('dakoku', r.name, { date: r.dateStr.replace(/\//g, '-') }); });
+      tbody.appendChild(tr);
+    });
+    document.getElementById('home-nashi-empty').hidden = rows.length > 0;
+  }
+
+  function refreshNashiSection(){
+    var cur = homeData.nashi.current, prev = homeData.nashi.prev;
+    renderHomeNashiTable(homeNashiView === 'cur' ? cur : prev);
+    var el = document.getElementById('home-nashi-badges');
+    el.innerHTML =
+      '<button class="periodbadge ' + (homeNashiView === 'cur' ? 'cur' : 'prev') + '" data-view="cur">今期間・' + cur.length + '件</button>' +
+      '<button class="periodbadge ' + (homeNashiView === 'prev' ? 'cur' : 'prev') + '" data-view="prev">前期間・' + prev.length + '件</button>';
+    Array.from(el.querySelectorAll('button')).forEach(function(btn){
+      btn.addEventListener('click', function(){ homeNashiView = btn.dataset.view; refreshNashiSection(); });
+    });
+  }
+
+  function renderHomeStamps(data){
+    var wrap = document.getElementById('home-stamps');
+    wrap.innerHTML = '';
+    var items = [
+      { cls:'c-pending', count: data.pending.current.length, label:'承認待ち', hint:'申請一覧へ',
+        onClick: function(){ jumpToTab('shinsei', '', { status: '承認待' }); } },
+      { cls:'c-warn', count: data.zangyou.length, label:'残業warning', hint:'36協定へ',
+        onClick: function(){ jumpToTab('shuukei', ''); } },
+      { cls:'c-yukyu', count: data.yukyuLow.length, label:'有給残少ない', hint:'有給管理へ',
+        onClick: function(){ jumpToTab('yukyu', ''); } },
+      { cls:'c-nashi', count: data.nashi.current.length, label:'申請なし', hint:'下の一覧へ',
+        onClick: function(){ document.getElementById('home-nashi-card').scrollIntoView({ behavior:'smooth', block:'start' }); } },
+      { cls:'c-shusei', count: data.shusei.length, label:'打刻ミス', hint:'修正依頼へ',
+        onClick: function(){ jumpToTab('shusei', ''); } },
+    ];
+    items.forEach(function(it){
+      var a = document.createElement('a');
+      a.href = '#'; a.className = 'homestamp ' + it.cls;
+      a.innerHTML = '<span class="circle">' + it.count + '</span>' +
+        '<span class="label">' + escapeHtml(it.label) + '<small>' + escapeHtml(it.hint) + '</small></span>';
+      a.addEventListener('click', function(e){ e.preventDefault(); it.onClick(); });
+      wrap.appendChild(a);
+    });
+  }
+
+  function renderHome(data){
+    homeData = data;
+    document.getElementById('home-period').textContent = '対象期間：' + data.period.start + ' 〜 ' + data.period.end;
+    document.getElementById('home-sheetlink').href = data.spreadsheetUrl;
+
+    renderHomeStamps(data);
+    refreshPendingSection();
+    refreshNashiSection();
+
+    renderHomeList('home-yukyu-list', data.yukyuLow, '現在、該当者はいません',
+      function(r){ return fmtDay_(r.zanzanNissu); },
+      function(r){ jumpToTab('yukyu', r.name); });
+
+    renderHomeList('home-zangyou-list', data.zangyou, '現在、警告対象者はいません',
+      function(r){ return r.hhmm + ' <span class="levelbadge ' + (r.level === '60h超' ? 'l60' : 'l45') + '">' + escapeHtml(r.level) + '</span>'; },
+      function(r){ jumpToTab('shuukei', r.name); });
+
+    renderHomeList('home-shusei-list', data.shusei, '現在、対象はありません',
+      function(r){ return escapeHtml(r.content); },
+      function(r){ jumpToTab('shusei', r.name); });
+  }
+
+  function loadHomeSummary(){
+    document.getElementById('home-period').textContent = '対象期間：読み込み中…';
+    return fetch(GAS_URL + '?mode=portalHomeSummary&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || 'ホーム画面の取得に失敗しました。', true); return; }
+        renderHome(data);
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
   // ── Googleログイン ──
   window.handleCredentialResponse = function(response){
     idToken = response.credential;
@@ -1527,7 +1811,7 @@
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').classList.add('show');
         document.getElementById('signedInAs').textContent = 'ログイン中：' + myEmail;
-        loadShinseiList();
+        tabReady.home = loadHomeSummary();
       })
       .catch(function(){
         document.getElementById('loadingNote').style.display = 'none';
