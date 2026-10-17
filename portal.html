@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠管理ポータル（西軽精機）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@900&family=Zen+Old+Mincho:wght@700&family=BIZ+UDGothic:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  /* ============================================================
+     方向性：精密検査票の罫線グリッド（白地の紙に近い明るさ）をベースに、
+     承認状況は朱肉のハンコ風スタンプで示す。ナビ（アイコンレール）と
+     一覧の見出し行だけは工場管制盤を思わせる濃紺にして締まりを出す。
+     見出し書体はZen Kaku Gothic New、スタンプはZen Old Mincho。
+     （2026-10-17、モックアップでの検討・選定を経て実装）
+
+     【2026-10-17】当初GAS（script.google.com）から直接配信する構成で実装したが、
+     GASのWebアプリは実際にはscript.googleusercontent.com系のサンドボックスiframe内に
+     表示される仕様で、このドメインはGoogle側の制約でOAuthクライアントの
+     「承認済みのJavaScript生成元」に登録できないことが判明（Googleログインが
+     origin_mismatchで失敗）。勤怠申請アプリ（shuusei-app）と同じGitHub Pages
+     （既に承認済みのオリジン）から配信する構成に変更した。データ取得・承認操作は
+     既存のWeb App（GAS側のmode=portalShinseiList・action=updateShinseiStatus）を
+     そのままfetchで呼ぶため、ロジック自体に変更はない
+     ============================================================ */
+  :root{
+    --bg:#F3F1EA; --panel:#FFFFFF; --field:#F7F5EF; --line:#D9D4C4; --ink:#1E1C16; --dim:#847C68;
+    --rail:#1F3A52; --rail-field:#2B4D6B; --rail-hover:#294660; --rail-ink:#F2EDE0; --rail-dim:#A9BBC8; --rail-accent:#E0A23D;
+    --pending:#B8862F; --provisional:#2E7A8C; --approved:#1E6E4E; --denied:#B23A2E;
+    --display:"Zen Kaku Gothic New",sans-serif; --stamp:"Zen Old Mincho",serif;
+    --body:"BIZ UDGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif; --mono:"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--body);
+  }
+
+  /* ── ログイン画面 ── */
+  #loginScreen{min-height:100%; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .logincard{width:100%; max-width:340px; background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    overflow:hidden; box-shadow:0 2px 0 var(--line);}
+  .logincard .lhead{background:var(--rail); color:var(--rail-ink); padding:22px 20px; text-align:center;}
+  .logincard .lhead .mark{width:40px; height:40px; border-radius:8px; background:var(--rail-field); margin:0 auto 10px;
+    display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:900; font-size:17px;
+    color:var(--rail-accent);}
+  .logincard .lhead h1{font-family:var(--display); font-weight:900; font-size:16px; margin:0 0 4px;}
+  .logincard .lhead p{font-size:12px; color:var(--rail-dim); margin:0;}
+  .logincard .lbody{padding:22px 20px; display:flex; flex-direction:column; align-items:center; gap:14px;}
+  .logincard .lnote{font-size:12px; color:var(--dim); text-align:center; line-height:1.6;}
+  #denied{display:none; font-size:13px; color:var(--denied); text-align:center; line-height:1.7;}
+  #loadingNote{display:none; font-size:12.5px; color:var(--dim); text-align:center;}
+
+  .app{display:none; grid-template-columns:64px 1fr; min-height:100%;}
+  .rail{background:var(--rail); border-right:1px solid #16293A; overflow:hidden; width:64px; transition:width .16s ease;}
+  .app:hover .rail{width:196px;}
+  .rail-inner{width:196px; padding:16px 10px; height:100%; display:flex; flex-direction:column;}
+  .rail .brand{display:flex; align-items:center; gap:10px; padding:0 8px; margin-bottom:22px; white-space:nowrap;}
+  .rail .brand .mark{width:30px; height:30px; border-radius:6px; background:var(--rail-field); border:1px solid rgba(255,255,255,.16);
+    display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:900; font-size:13px; color:var(--rail-accent);
+    flex-shrink:0;}
+  .rail .brand .tx{font-family:var(--display); font-weight:900; font-size:11.5px; line-height:1.5; color:var(--rail-ink);}
+  .rail .brand .tx small{display:block; font-size:9px; color:var(--rail-dim); font-family:var(--body); font-weight:700;}
+  .rail nav{display:flex; flex-direction:column; gap:3px;}
+  .rail button{display:flex; align-items:center; gap:13px; background:none; border:none; color:var(--rail-dim);
+    font-family:var(--body); font-size:13px; font-weight:700; padding:10px 9px; border-radius:7px; cursor:pointer;
+    text-align:left; white-space:nowrap; width:176px;}
+  .rail button .ic{width:18px; text-align:center; font-size:14px; flex-shrink:0; filter:grayscale(1); opacity:.6;}
+  .rail button.active{background:var(--rail-field); color:var(--rail-ink);}
+  .rail button.active .ic{filter:none; opacity:1;}
+  .rail button:hover:not(.active){background:var(--rail-hover); color:var(--rail-ink);}
+  .rail .who{margin-top:auto; padding:12px 9px 2px; font-size:10.5px; color:var(--rail-dim); border-top:1px solid rgba(255,255,255,.14);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  .main{padding:22px 24px 60px; min-width:0;}
+  .pagehead{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;}
+  .pagehead h1{font-family:var(--display); font-weight:900; font-size:18px; margin:0; color:var(--ink);}
+  .pagehead .sub{font-size:11.5px; color:var(--dim); font-family:var(--mono);}
+
+  .stub{background:var(--panel); border:1px dashed var(--line); border-radius:10px; padding:48px 20px; text-align:center;
+    color:var(--dim); font-size:13.5px;}
+  .stub b{display:block; font-family:var(--display); font-weight:900; font-size:15px; color:var(--ink); margin-bottom:8px;}
+
+  /* ── フィルターバー ── */
+  .filterbar{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;}
+  .f{display:flex; flex-direction:column; gap:4px;}
+  .f label{font-size:10px; font-weight:700; color:var(--dim); letter-spacing:.06em; text-transform:uppercase;
+    font-family:var(--mono);}
+  .f input, .f select{background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px 10px;
+    font-size:13px; font-family:var(--body); color:var(--ink); min-width:150px;}
+  .f.grow{flex:1; min-width:200px;}
+  .f.grow input{width:100%;}
+  .pills{display:flex; gap:6px; flex-wrap:wrap;}
+  .pill{font-size:11.5px; font-weight:700; padding:7px 12px; border-radius:5px; cursor:pointer; border:1px solid var(--line);
+    background:var(--field); color:var(--dim); font-family:var(--mono);}
+  .pill[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink);}
+  .resultcount{font-size:11.5px; color:var(--dim); margin:0 0 10px 2px; font-family:var(--mono);}
+  .refreshbtn{font-family:var(--mono); font-size:11.5px; font-weight:700; padding:7px 12px; border-radius:5px;
+    border:1px solid var(--line); background:var(--field); color:var(--dim); cursor:pointer;}
+
+  /* ── 検査票グリッド ── */
+  .sheet{background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{text-align:left; font-size:10px; font-weight:700; color:var(--rail-ink); padding:10px 12px; letter-spacing:.07em;
+    text-transform:uppercase; font-family:var(--mono); border-bottom:1.5px solid #16293A; background:var(--rail);
+    white-space:nowrap;}
+  tbody tr{border-bottom:1px solid var(--line); cursor:pointer;}
+  tbody tr:last-child{border-bottom:none;}
+  tbody tr:hover{background:var(--bg);}
+  td{padding:10px 12px; vertical-align:middle;}
+  td.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--dim); font-size:12.5px;}
+  td.name{font-weight:700; color:var(--ink);}
+  .emptystate{padding:40px 20px; text-align:center; color:var(--dim); font-size:13px;}
+
+  /* ── ハンコ風スタンプ ── */
+  .stamp{
+    font-family:var(--stamp); font-weight:700; font-size:11.5px; display:inline-flex; align-items:center;
+    justify-content:center; width:42px; height:42px; border-radius:50%; border:2px solid; transform:rotate(-7deg);
+    writing-mode:vertical-rl; letter-spacing:1px; background:rgba(0,0,0,.02);
+  }
+  .stamp.pending{border-color:var(--pending); color:var(--pending);}
+  .stamp.provisional{border-color:var(--provisional); color:var(--provisional);}
+  .stamp.approved{border-color:var(--approved); color:var(--approved);}
+  .stamp.denied{border-color:var(--denied); color:var(--denied);}
+
+  .rowbtns{display:flex; gap:6px;}
+  .rb{font-family:var(--mono); font-size:11px; font-weight:700; padding:5px 11px; border-radius:5px;
+    border:1px solid var(--line); cursor:pointer; background:var(--field); color:var(--dim);}
+  .rb:disabled{opacity:.5; cursor:default;}
+  .rb.go:hover{border-color:var(--approved); color:var(--approved);}
+  .rb.stop:hover{border-color:var(--denied); color:var(--denied);}
+  .rb.back:hover{border-color:var(--pending); color:var(--pending);}
+
+  /* ── 詳細ドロワー ── */
+  .drawer-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:20; opacity:0; pointer-events:none;
+    transition:opacity .15s ease;}
+  .drawer-backdrop.open{opacity:1; pointer-events:auto;}
+  .drawer{position:fixed; top:0; right:0; bottom:0; width:min(380px, 92vw); background:var(--panel);
+    border-left:1px solid var(--line); z-index:21; transform:translateX(100%); transition:transform .18s ease;
+    padding:22px 20px; overflow-y:auto;}
+  .drawer.open{transform:translateX(0);}
+  .drawer-close{background:none; border:none; font-size:12.5px; color:var(--dim); cursor:pointer; padding:4px 0;
+    margin-bottom:10px; font-family:var(--mono);}
+  .drawer h2{font-family:var(--display); font-weight:900; font-size:16px; color:var(--ink); margin:4px 0 2px;}
+  .drawer .appid{font-family:var(--mono); font-size:11.5px; color:var(--dim); margin-bottom:16px;}
+  .drawer dt{font-size:10px; color:var(--dim); margin-top:13px; font-family:var(--mono); text-transform:uppercase;
+    letter-spacing:.05em;}
+  .drawer dd{margin:3px 0 0; font-size:14px; font-weight:700; color:var(--ink);}
+  .drawer .reason{background:var(--field); border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+    font-size:13px; line-height:1.6; margin-top:3px; color:var(--ink); white-space:pre-wrap;}
+  .drawer-actions{display:flex; gap:8px; margin-top:20px;}
+  .drawer-actions button{flex:1; padding:11px; border-radius:7px; border:1px solid var(--line); font-weight:700;
+    font-size:13.5px; cursor:pointer; font-family:var(--body);}
+  .drawer-actions button:disabled{opacity:.5; cursor:default;}
+  .drawer-actions .go{background:var(--approved); color:#06241A; border-color:var(--approved);}
+  .drawer-actions .stop{background:var(--field); color:var(--denied); border-color:var(--denied);}
+  .drawer-actions .back{background:var(--field); color:var(--pending); border-color:var(--pending);}
+
+  .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(16px);
+    background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:7px; font-size:12.5px; font-weight:700;
+    opacity:0; pointer-events:none; transition:all .18s ease; z-index:30; font-family:var(--mono); max-width:90vw;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--denied);}
+
+  @media (max-width:720px){
+    .app{grid-template-columns:1fr;}
+    .rail{width:100%; position:sticky; top:0; z-index:15;}
+    .app:hover .rail{width:100%;}
+    .rail-inner{width:100%;}
+    .rail nav{flex-direction:row; overflow-x:auto;}
+    .rail button{width:auto;}
+    .sheet{overflow-x:auto;}
+    table{min-width:700px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="logincard">
+    <div class="lhead">
+      <div class="mark">西</div>
+      <h1>勤怠管理ポータル</h1>
+      <p>西軽精機・総務課専用</p>
+    </div>
+    <div class="lbody">
+      <div id="g_id_onload"
+           data-client_id="800178947678-ue8faa8jscidc84656i4ch1d4j0n9lks.apps.googleusercontent.com"
+           data-callback="handleCredentialResponse"
+           data-auto_select="true"
+           data-cancel_on_tap_outside="false">
+      </div>
+      <div class="g_id_signin" data-type="standard"></div>
+      <div class="lnote">代理入力管理者（総務課）としてGoogleアカウントでログインしてください。</div>
+      <div id="loadingNote">確認中…</div>
+      <div id="denied">このポータルは代理入力管理者（総務課）専用です。<br>権限が必要な場合は総務までご連絡ください。</div>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="rail"><div class="rail-inner">
+    <div class="brand"><div class="mark">西</div><div class="tx">勤怠管理<br>ポータル<small>西軽精機・総務課</small></div></div>
+    <nav>
+      <button class="active" data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
+      <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
+      <button data-nav="shuukei"><span class="ic">📊</span>月次集計・36協定</button>
+      <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
+    </nav>
+    <div class="who" id="signedInAs"></div>
+  </div></div>
+
+  <div class="main">
+    <div id="page-shinsei">
+      <div class="pagehead"><h1>申請一覧</h1><span class="sub">SHINSEI-KANRI / LIVE QUEUE</span></div>
+
+      <div class="filterbar">
+        <div class="f grow"><label>Search</label><input type="search" id="f-search" placeholder="氏名・申請IDで検索"></div>
+        <div class="f"><label>種別</label>
+          <select id="f-type"><option value="">すべて</option><option value="yukyu">有給・遅刻・早退・特別休暇</option>
+            <option value="zangyou">残業</option><option value="chokkou">直行・直帰・出張</option></select></div>
+        <div class="f"><label>状況</label>
+          <div class="pills" id="f-status">
+            <button class="pill" aria-pressed="true" data-status="">すべて</button>
+            <button class="pill" aria-pressed="false" data-status="承認待">待</button>
+            <button class="pill" aria-pressed="false" data-status="仮承認">仮</button>
+            <button class="pill" aria-pressed="false" data-status="承認済">済</button>
+            <button class="pill" aria-pressed="false" data-status="否認">否</button>
+          </div></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="refresh">再読み込み</button></div>
+      </div>
+
+      <p class="resultcount" id="resultcount"></p>
+
+      <div class="sheet">
+        <table>
+          <thead><tr><th>ID</th><th>氏名</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
+      </div>
+    </div>
+
+    <div id="page-dakoku" hidden><div class="pagehead"><h1>打刻ログ</h1></div>
+      <div class="stub"><b>打刻ログ</b>社員・日付での検索、出勤/退勤/中抜けの一覧表示を予定しています。</div></div>
+    <div id="page-shuukei" hidden><div class="pagehead"><h1>月次集計・36協定</h1></div>
+      <div class="stub"><b>月次集計・残業・36協定</b>既存の集計シートの数値を見やすく表示する画面を予定しています。</div></div>
+    <div id="page-shain" hidden><div class="pagehead"><h1>社員マスタ</h1></div>
+      <div class="stub"><b>社員マスタ</b>社員一覧・勤務曜日・テスト参加状況を確認できる画面を予定しています。</div></div>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="backdrop"></div>
+<div class="drawer" id="drawer" aria-hidden="true">
+  <button class="drawer-close" id="drawer-close">← 一覧へ戻る</button>
+  <h2 id="d-name"></h2>
+  <div class="appid" id="d-appid"></div>
+  <dl>
+    <dt>種別・内容</dt><dd id="d-type"></dd>
+    <dt>対象日</dt><dd id="d-date"></dd>
+    <dt>事前/事後</dt><dd id="d-jizen"></dd>
+    <dt>判定</dt><dd id="d-status"></dd>
+    <dt>理由・備考</dt><dd><div class="reason" id="d-reason"></div></dd>
+  </dl>
+  <div class="drawer-actions" id="d-actions"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var GAS_URL = 'https://script.google.com/a/macros/nishikaru.co.jp/s/AKfycbzht6wuAjcOKeiGL20sHIEE1ip10b7haJfb5lFNahg7XN-ZBKZtwhxE3sfPhydCA21xYg/exec';
+  var idToken = null, myEmail = '';
+  var ROWS = [];
+  var state = { search:'', type:'', status:'' };
+  var currentId = null;
+  var busy = false;
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function base64UrlDecode_(str){
+    var base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    return atob(base64);
+  }
+
+  var STAMP = {'承認待':['pending','待'], '仮承認':['provisional','仮'], '承認済':['approved','済'], '否認':['denied','否']};
+
+  // サーバーから返ってくる生データ（COL_SHINSEIの値）を、画面表示用の形に変換する
+  var CHOKKOU_TYPES = ['直行のみ', '直帰のみ', '直行・直帰'];
+  function categoryOf(r){
+    if (r.shinsei === '残業') return 'zangyou';
+    if (CHOKKOU_TYPES.indexOf(r.shinsei) !== -1) return 'chokkou';
+    return 'yukyu';
+  }
+  function buildDetail(r){
+    if (r.shinsei === '残業') return (r.startTime && r.endTime) ? (r.startTime + '〜' + r.endTime + ' 予定') : '残業';
+    if (CHOKKOU_TYPES.indexOf(r.shinsei) !== -1) return r.shinsei;
+    if (r.yukyuKbn && r.yukyuKbn.indexOf('特別休暇') !== -1) return r.yukyuKbn;
+    if (r.yukyuKbn === '傷病等特別休暇') return r.yukyuKbn;
+    if (r.shinsei === '1日') return (r.yukyuKbn || '通常有給') + '（1日）';
+    if (r.shinsei === '午前休' || r.shinsei === '午後休') return r.shinsei + (r.yukyuKbn ? '（' + r.yukyuKbn + '）' : '');
+    if (['遅刻', '早退', '中抜け', '遅刻・中抜け＋早退'].indexOf(r.shinsei) !== -1) {
+      return r.shinsei + (r.jikanSowtai ? '（' + r.jikanSowtai + '）' : '');
+    }
+    return r.shinsei || r.yukyuKbn || '—';
+  }
+  function buildDateLabel(r){
+    if (r.taishouDateEnd && r.taishouDateEnd !== r.taishouDate) return r.taishouDate + '〜' + r.taishouDateEnd;
+    return r.taishouDate || '—';
+  }
+
+  function actionsFor(status, size){
+    var go = size === 'drawer' ? '承認する' : '承認';
+    var stop = size === 'drawer' ? '否認する' : '否認';
+    var back = size === 'drawer' ? '承認待に差し戻す' : '差し戻し';
+    var denyChange = size === 'drawer' ? '否認に変更する' : '否認に変更';
+    if (status === '承認待' || status === '仮承認') return [['go','approve',go], ['stop','deny',stop]];
+    if (status === '承認済') return [['back','revert',back], ['stop','deny',denyChange]];
+    return [['back','revert',back]]; // 否認
+  }
+
+  function matches(r){
+    if (state.status && r.status !== state.status) return false;
+    if (state.type && categoryOf(r) !== state.type) return false;
+    if (state.search){
+      var q = state.search.toLowerCase();
+      if (r.name.toLowerCase().indexOf(q) === -1 && r.appId.toLowerCase().indexOf(q) === -1) return false;
+    }
+    return true;
+  }
+
+  function render(){
+    var tbody = document.getElementById('tbody');
+    var filtered = ROWS.filter(matches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.id = r.appId;
+      var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
+      var btns = actionsFor(r.status, 'row').map(function(a){
+        return '<button class="rb ' + a[0] + '" data-act="' + a[1] + '" data-id="' + escapeHtml(r.appId) + '">' + a[2] + '</button>';
+      }).join('');
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.detail) + '</td>' +
+        '<td class="mono">' + escapeHtml(buildDateLabel(r)) + '</td>' +
+        '<td>' + escapeHtml(r.jizenGo || '—') + '</td>' +
+        '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
+        '<td><div class="rowbtns">' + btns + '</div></td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('emptystate').hidden = filtered.length > 0;
+    document.getElementById('resultcount').textContent = filtered.length + ' 件（全' + ROWS.length + '件中）';
+  }
+
+  document.getElementById('f-search').addEventListener('input', function(e){ state.search = e.target.value; render(); });
+  document.getElementById('f-type').addEventListener('change', function(e){ state.type = e.target.value; render(); });
+  document.getElementById('f-status').addEventListener('click', function(e){
+    var btn = e.target.closest('.pill'); if (!btn) return;
+    document.querySelectorAll('#f-status .pill').forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+    btn.setAttribute('aria-pressed','true'); state.status = btn.dataset.status; render();
+  });
+  document.getElementById('refresh').addEventListener('click', function(){ loadShinseiList(); });
+
+  var drawer = document.getElementById('drawer'), backdrop = document.getElementById('backdrop');
+  function openDrawer(id){
+    var r = ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
+    currentId = id;
+    document.getElementById('d-name').textContent = r.name;
+    document.getElementById('d-appid').textContent = id;
+    document.getElementById('d-type').textContent = r.detail;
+    document.getElementById('d-date').textContent = buildDateLabel(r);
+    document.getElementById('d-jizen').textContent = r.jizenGo || '—';
+    var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
+    document.getElementById('d-status').innerHTML = '<span class="stamp ' + st[0] + '">' + st[1] + '</span>';
+    document.getElementById('d-reason').textContent = r.riyu || '（記入なし）';
+    document.getElementById('d-actions').innerHTML = actionsFor(r.status, 'drawer').map(function(a){
+      return '<button class="' + a[0] + '" data-act="' + a[1] + '" data-id="' + escapeHtml(r.appId) + '">' + a[2] + '</button>';
+    }).join('');
+    drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false'); backdrop.classList.add('open');
+  }
+  function closeDrawer(){ drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); backdrop.classList.remove('open'); currentId = null; }
+  document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+  backdrop.addEventListener('click', closeDrawer);
+
+  var STATUS_FOR_ACT = { approve:'承認済', deny:'否認', revert:'承認待' };
+  function doAction(id, act){
+    if (busy) return;
+    var r = ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
+    var newStatus = STATUS_FOR_ACT[act];
+    busy = true;
+    setButtonsDisabled(true);
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateShinseiStatus', token: idToken, appId: id, status: newStatus })
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        busy = false; setButtonsDisabled(false);
+        if (!data.success) { showToast(data.message || '処理に失敗しました。', true); return; }
+        showToast((newStatus === '承認待' ? '承認待に差し戻しました' : newStatus + 'にしました') + '：' + r.name + '（' + id + '）');
+        if (currentId === id) closeDrawer();
+        loadShinseiList();
+      })
+      .catch(function(err){
+        busy = false; setButtonsDisabled(false);
+        showToast('通信エラーが発生しました。', true);
+      });
+  }
+  function setButtonsDisabled(disabled){
+    document.querySelectorAll('.rb, .drawer-actions button').forEach(function(b){ b.disabled = disabled; });
+  }
+
+  document.getElementById('tbody').addEventListener('click', function(e){
+    var actBtn = e.target.closest('[data-act]');
+    if (actBtn){ e.stopPropagation(); doAction(actBtn.dataset.id, actBtn.dataset.act); return; }
+    var tr = e.target.closest('tr'); if (tr) openDrawer(tr.dataset.id);
+  });
+  document.getElementById('d-actions').addEventListener('click', function(e){
+    var b = e.target.closest('[data-act]'); if (b) doAction(b.dataset.id, b.dataset.act);
+  });
+
+  var toastTimer;
+  function showToast(msg, isErr){
+    var t = document.getElementById('toast'); t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
+  }
+
+  document.querySelectorAll('.rail nav button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      ['shinsei','dakoku','shuukei','shain'].forEach(function(name){
+        document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
+      });
+    });
+  });
+
+  function loadShinseiList(){
+    document.getElementById('resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalShinseiList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || '一覧の取得に失敗しました。', true); return; }
+        ROWS = (data.rows || []).map(function(r){
+          r.detail = buildDetail(r);
+          return r;
+        });
+        render();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── Googleログイン ──
+  window.handleCredentialResponse = function(response){
+    idToken = response.credential;
+    try {
+      var payload = JSON.parse(base64UrlDecode_(idToken.split('.')[1]));
+      myEmail = payload.email;
+    } catch (e) {}
+
+    document.getElementById('loadingNote').style.display = 'block';
+    fetch(GAS_URL + '?mode=checkDairiAdmin&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        document.getElementById('loadingNote').style.display = 'none';
+        if (!data.success || !data.isDairiAdmin) {
+          document.getElementById('denied').style.display = 'block';
+          return;
+        }
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'grid';
+        document.getElementById('signedInAs').textContent = 'ログイン中：' + myEmail;
+        loadShinseiList();
+      })
+      .catch(function(){
+        document.getElementById('loadingNote').style.display = 'none';
+        showToast('確認に失敗しました。時間をおいて再度お試しください。', true);
+      });
+  };
+})();
+</script>
+</body>
+</html>
