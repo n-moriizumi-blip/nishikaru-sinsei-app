@@ -183,6 +183,14 @@
   .monthgrid .mbox .ml{font-size:10px; color:var(--dim); font-family:var(--mono);}
   .monthgrid .mbox .mv{font-family:var(--mono); font-size:14px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;}
 
+  /* ── 特別休暇管理（特別休暇管理シートのTOKUBETSU_KANRI_COLORと同じ配色） ── */
+  tr.tk-keiji{border-left:4px solid #880E4F; background:#FCE4EC;}
+  tr.tk-choji{border-left:4px solid #37474F; background:#ECEFF1;}
+  tr.tk-shobyo{border-left:4px solid #E65100; background:#FFF3E0;}
+  tr.tk-tsumitate{border-left:4px solid #01579B; background:#E1F5FE;}
+  .choukabadge{font-size:11px; font-weight:700; color:var(--denied); background:var(--field);
+    border:1px solid var(--denied); border-radius:999px; padding:2px 9px;}
+
   .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(16px);
     background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:7px; font-size:12.5px; font-weight:700;
     opacity:0; pointer-events:none; transition:all .18s ease; z-index:30; font-family:var(--mono); max-width:90vw;}
@@ -236,6 +244,7 @@
       <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
       <button data-nav="shuukei"><span class="ic">📊</span>36協定</button>
       <button data-nav="yukyu"><span class="ic">🏖️</span>有給管理</button>
+      <button data-nav="tokubetsu"><span class="ic">🎌</span>特別休暇管理</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -352,6 +361,25 @@
         <div class="emptystate" id="yukyu-emptystate" hidden>データがありません。</div>
       </div>
     </div>
+
+    <div id="page-tokubetsu" hidden>
+      <div class="pagehead"><h1>特別休暇管理</h1><span class="sub">TOKUBETSU-KANRI / SPECIAL LEAVE</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="ft-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>種別</label><select id="ft-type"><option value="">すべて</option>
+          <option value="特別休暇（弔事）">弔事</option><option value="特別休暇（慶事）">慶事</option>
+          <option value="傷病等特別休暇">傷病等</option><option value="積立有給">積立有給</option></select></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="tokubetsu-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="tokubetsu-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>氏名</th><th>種別</th><th>詳細</th><th>起算日</th><th>付与日数</th><th>消化日数</th><th>残日数</th><th>使用期限</th><th>状況</th></tr></thead>
+          <tbody id="tokubetsu-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="tokubetsu-emptystate" hidden>条件に一致するデータがありません。</div>
+      </div>
+    </div>
     <div id="page-shain" hidden>
       <div class="pagehead"><h1>社員マスタ</h1><span class="sub">SHAIN-MASTER / ROSTER</span></div>
       <div class="filterbar">
@@ -453,6 +481,25 @@
     <dt>今年度積立移行</dt><dd id="y-tido"></dd>
     <dt>積立有給消化日数</dt><dd id="y-tshoka"></dd>
     <dt>積立有給残日数</dt><dd id="y-tzan"></dd>
+  </dl>
+</div>
+
+<div class="drawer-backdrop" id="t-backdrop"></div>
+<div class="drawer" id="t-drawer" aria-hidden="true">
+  <button class="drawer-close" id="t-drawer-close">← 一覧へ戻る</button>
+  <h2 id="t-name"></h2>
+  <div class="appid" id="t-appid"></div>
+  <dl>
+    <dt>申請日時</dt><dd id="t-appdt"></dd>
+    <dt>種別</dt><dd id="t-shinsei"></dd>
+    <dt>詳細</dt><dd id="t-detail"></dd>
+    <dt>起算日</dt><dd id="t-kisan"></dd>
+    <dt>付与日数</dt><dd id="t-fuyo"></dd>
+    <dt>消化日数</dt><dd id="t-shoka"></dd>
+    <dt>残日数</dt><dd id="t-zan"></dd>
+    <dt>使用期限</dt><dd id="t-kigen"></dd>
+    <dt>状況</dt><dd id="t-chouka"></dd>
+    <dt>備考</dt><dd><div class="reason" id="t-biko"></div></dd>
   </dl>
 </div>
 
@@ -681,12 +728,12 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
-  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false;
+  var dakokuLoaded = false, shuseiLoaded = false, zangyouLoaded = false, shainLoaded = false, yukyuLoaded = false, tokubetsuLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
-      ['shinsei','shusei','dakoku','shuukei','yukyu','shain'].forEach(function(name){
+      ['shinsei','shusei','dakoku','shuukei','yukyu','tokubetsu','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
       // 各タブは初めて開いた時だけ読み込む（ログイン直後の表示を軽くするため）
@@ -694,6 +741,7 @@
       if (btn.dataset.nav === 'shusei' && !shuseiLoaded) { shuseiLoaded = true; loadShuuseiList(); }
       if (btn.dataset.nav === 'shuukei' && !zangyouLoaded) { zangyouLoaded = true; loadZangyouList(); }
       if (btn.dataset.nav === 'yukyu' && !yukyuLoaded) { yukyuLoaded = true; loadYukyuList(); }
+      if (btn.dataset.nav === 'tokubetsu' && !tokubetsuLoaded) { tokubetsuLoaded = true; loadTokubetsuList(); }
       if (btn.dataset.nav === 'shain' && !shainLoaded) { shainLoaded = true; loadShainList(); }
     });
   });
@@ -1165,6 +1213,94 @@
         YUKYU_ROWS = data.rows || [];
         populateYukyuDropdown();
         renderYukyu();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 特別休暇管理（閲覧専用） ──
+  var TOKU_ROWS = [];
+  var tState = { name:'', type:'' };
+  var TOKU_TYPE_CLASS = {
+    '特別休暇（弔事）':'tk-choji', '特別休暇（慶事）':'tk-keiji',
+    '傷病等特別休暇':'tk-shobyo', '積立有給':'tk-tsumitate'
+  };
+
+  function tMatches(r){
+    if (tState.type && r.shinsei !== tState.type) return false;
+    if (tState.name && r.name !== tState.name) return false;
+    return true;
+  }
+
+  function populateTokubetsuDropdown(){
+    var nameSel = document.getElementById('ft-name');
+    var names = Array.from(new Set(TOKU_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(tState.name) !== -1 ? tState.name : '';
+    tState.name = nameSel.value;
+  }
+
+  function renderTokubetsu(){
+    var tbody = document.getElementById('tokubetsu-tbody');
+    var filtered = TOKU_ROWS.filter(tMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.dataset.id = r.appId;
+      if (TOKU_TYPE_CLASS[r.shinsei]) tr.className = TOKU_TYPE_CLASS[r.shinsei];
+      tr.innerHTML =
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.shinsei) + '</td>' +
+        '<td>' + escapeHtml(r.detail || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.kisanDate || '—') + '</td>' +
+        '<td class="mono">' + fmtDay_(r.fuyoNissu) + '</td>' +
+        '<td class="mono">' + fmtDay_(r.shokaNissu) + '</td>' +
+        '<td class="mono">' + fmtDay_(r.zanNissu) + '</td>' +
+        '<td class="mono">' + escapeHtml(r.kigen || '—') + '</td>' +
+        '<td>' + (r.chouka ? '<span class="choukabadge">' + escapeHtml(r.chouka) + '</span>' : '—') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('tokubetsu-emptystate').hidden = filtered.length > 0;
+    document.getElementById('tokubetsu-resultcount').textContent = filtered.length + ' 件（全' + TOKU_ROWS.length + '件中）';
+  }
+
+  document.getElementById('ft-name').addEventListener('change', function(e){ tState.name = e.target.value; renderTokubetsu(); });
+  document.getElementById('ft-type').addEventListener('change', function(e){ tState.type = e.target.value; renderTokubetsu(); });
+  document.getElementById('tokubetsu-refresh').addEventListener('click', function(){ loadTokubetsuList(); });
+
+  var tDrawer = document.getElementById('t-drawer'), tBackdrop = document.getElementById('t-backdrop');
+  function openTokubetsuDrawer(id){
+    var r = TOKU_ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
+    document.getElementById('t-name').textContent = r.name;
+    document.getElementById('t-appid').textContent = id;
+    document.getElementById('t-appdt').textContent = r.appDateTime || '—';
+    document.getElementById('t-shinsei').textContent = r.shinsei;
+    document.getElementById('t-detail').textContent = r.detail || '—';
+    document.getElementById('t-kisan').textContent = r.kisanDate || '—';
+    document.getElementById('t-fuyo').textContent = fmtDay_(r.fuyoNissu);
+    document.getElementById('t-shoka').textContent = fmtDay_(r.shokaNissu);
+    document.getElementById('t-zan').textContent = fmtDay_(r.zanNissu);
+    document.getElementById('t-kigen').textContent = r.kigen || '—';
+    document.getElementById('t-chouka').innerHTML = r.chouka ? '<span class="choukabadge">' + escapeHtml(r.chouka) + '</span>' : '—';
+    document.getElementById('t-biko').textContent = r.biko || '（記入なし）';
+    tDrawer.classList.add('open'); tDrawer.setAttribute('aria-hidden','false'); tBackdrop.classList.add('open');
+  }
+  function closeTokubetsuDrawer(){ tDrawer.classList.remove('open'); tDrawer.setAttribute('aria-hidden','true'); tBackdrop.classList.remove('open'); }
+  document.getElementById('t-drawer-close').addEventListener('click', closeTokubetsuDrawer);
+  tBackdrop.addEventListener('click', closeTokubetsuDrawer);
+  document.getElementById('tokubetsu-tbody').addEventListener('click', function(e){
+    var tr = e.target.closest('tr'); if (tr) openTokubetsuDrawer(tr.dataset.id);
+  });
+
+  function loadTokubetsuList(){
+    document.getElementById('tokubetsu-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalTokubetsuList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
+        TOKU_ROWS = data.rows || [];
+        populateTokubetsuDropdown();
+        renderTokubetsu();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
