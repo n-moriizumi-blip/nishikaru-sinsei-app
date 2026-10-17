@@ -229,6 +229,7 @@
       <div class="filterbar">
         <div class="f"><label>申請ID</label><select id="f-id"><option value="">すべて</option></select></div>
         <div class="f grow"><label>氏名</label><select id="f-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>有給種別</label><select id="f-ykbn"><option value="">すべて</option></select></div>
         <div class="f"><label>対象日</label><input type="date" id="f-date"></div>
         <div class="f"><label>種別</label>
           <select id="f-type"><option value="">すべて</option><option value="yukyu">有給・遅刻・早退・特別休暇</option>
@@ -248,7 +249,7 @@
 
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th>有給種別</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
@@ -270,6 +271,7 @@
   <h2 id="d-name"></h2>
   <div class="appid" id="d-appid"></div>
   <dl>
+    <dt>有給種別</dt><dd id="d-ykbn"></dd>
     <dt>種別・内容</dt><dd id="d-type"></dd>
     <dt>対象日</dt><dd id="d-date"></dd>
     <dt>事前/事後</dt><dd id="d-jizen"></dd>
@@ -286,7 +288,7 @@
   var GAS_URL = 'https://script.google.com/a/macros/nishikaru.co.jp/s/AKfycbzht6wuAjcOKeiGL20sHIEE1ip10b7haJfb5lFNahg7XN-ZBKZtwhxE3sfPhydCA21xYg/exec';
   var idToken = null, myEmail = '';
   var ROWS = [];
-  var state = { id:'', name:'', date:'', type:'', status:'' };
+  var state = { id:'', name:'', ykbn:'', date:'', type:'', status:'' };
   var currentId = null;
   var busy = false;
 
@@ -346,6 +348,7 @@
     if (state.type && categoryOf(r) !== state.type) return false;
     if (state.id && r.appId !== state.id) return false;
     if (state.name && r.name !== state.name) return false;
+    if (state.ykbn && r.yukyuKbn !== state.ykbn) return false;
     if (state.date) {
       var d = normDate(state.date);
       var start = normDate(r.taishouDate);
@@ -358,18 +361,22 @@
   // ROWS読み込み後、申請ID・氏名プルダウンの選択肢を実データから作り直す。
   // 選び直す必要が無いよう、既に選択中の値がまだ候補にあれば維持する
   function populateFilterDropdowns(){
-    var idSel = document.getElementById('f-id'), nameSel = document.getElementById('f-name');
+    var idSel = document.getElementById('f-id'), nameSel = document.getElementById('f-name'), ykbnSel = document.getElementById('f-ykbn');
     var ids = Array.from(new Set(ROWS.map(function(r){ return r.appId; }))).sort().reverse();
     var names = Array.from(new Set(ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    var ykbns = Array.from(new Set(ROWS.map(function(r){ return r.yukyuKbn; }).filter(Boolean))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
 
     idSel.innerHTML = '<option value="">すべて</option>' +
       ids.map(function(id){ return '<option value="' + escapeHtml(id) + '">' + escapeHtml(id) + '</option>'; }).join('');
     nameSel.innerHTML = '<option value="">すべて</option>' +
       names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    ykbnSel.innerHTML = '<option value="">すべて</option>' +
+      ykbns.map(function(k){ return '<option value="' + escapeHtml(k) + '">' + escapeHtml(k) + '</option>'; }).join('');
 
     idSel.value = ids.indexOf(state.id) !== -1 ? state.id : '';
     nameSel.value = names.indexOf(state.name) !== -1 ? state.name : '';
-    state.id = idSel.value; state.name = nameSel.value;
+    ykbnSel.value = ykbns.indexOf(state.ykbn) !== -1 ? state.ykbn : '';
+    state.id = idSel.value; state.name = nameSel.value; state.ykbn = ykbnSel.value;
   }
 
   function render(){
@@ -386,6 +393,7 @@
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.yukyuKbn || '—') + '</td>' +
         '<td>' + escapeHtml(r.detail) + '</td>' +
         '<td class="mono">' + escapeHtml(buildDateLabel(r)) + '</td>' +
         '<td>' + escapeHtml(r.jizenGo || '—') + '</td>' +
@@ -399,6 +407,7 @@
 
   document.getElementById('f-id').addEventListener('change', function(e){ state.id = e.target.value; render(); });
   document.getElementById('f-name').addEventListener('change', function(e){ state.name = e.target.value; render(); });
+  document.getElementById('f-ykbn').addEventListener('change', function(e){ state.ykbn = e.target.value; render(); });
   document.getElementById('f-date').addEventListener('change', function(e){ state.date = e.target.value; render(); });
   document.getElementById('f-type').addEventListener('change', function(e){ state.type = e.target.value; render(); });
   document.getElementById('f-status').addEventListener('click', function(e){
@@ -414,6 +423,7 @@
     currentId = id;
     document.getElementById('d-name').textContent = r.name;
     document.getElementById('d-appid').textContent = id;
+    document.getElementById('d-ykbn').textContent = r.yukyuKbn || '—';
     document.getElementById('d-type').textContent = r.detail;
     document.getElementById('d-date').textContent = buildDateLabel(r);
     document.getElementById('d-jizen').textContent = r.jizenGo || '—';
