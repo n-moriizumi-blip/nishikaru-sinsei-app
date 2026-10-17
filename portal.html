@@ -328,8 +328,10 @@
   }
   function buildDetail(r){
     if (r.shinsei === '残業') {
-      if (r.jitsuZangyou) return '実績 ' + r.jitsuZangyou;
-      return (r.startTime && r.endTime) ? (r.startTime + '〜' + r.endTime + ' 予定') : '残業';
+      var sched = (r.startTime && r.endTime) ? (r.startTime + '〜' + r.endTime + ' 予定') : '';
+      var actual = r.jitsuZangyou ? ('実績 ' + r.jitsuZangyou) : '';
+      if (sched && actual) return sched + '／' + actual;
+      return sched || actual || '残業';
     }
     if (CHOKKOU_TYPES.indexOf(r.shinsei) !== -1) return r.shinsei;
     if (r.yukyuKbn && r.yukyuKbn.indexOf('特別休暇') !== -1) return r.yukyuKbn;
