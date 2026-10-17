@@ -120,6 +120,9 @@
   tbody tr:hover{background:var(--bg);}
   td{padding:10px 12px; vertical-align:middle; border-right:1px solid var(--line);}
   td:last-child{border-right:none;}
+  /* ── 打刻確認：日付・曜日列を横スクロールでも固定表示（leftはJSで実測して設定） ── */
+  .dk-col0, .dk-col1{position:sticky; z-index:1; border-right:1.5px solid #999999;}
+  .dk-corner{position:sticky; z-index:4; border-right:1.5px solid #16293A;}
   td.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--dim); font-size:12.5px;}
   td.name{font-weight:700; color:var(--ink);}
   .emptystate{padding:40px 20px; text-align:center; color:var(--dim); font-size:13px;}
@@ -262,6 +265,10 @@
   .statuspill.provisional{color:var(--provisional); border-color:var(--provisional);}
   .statuspill.approved{color:var(--approved); border-color:var(--approved);}
   .statuspill.denied{color:var(--denied); border-color:var(--denied);}
+
+  .kbnbadge{font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; font-family:var(--mono); white-space:nowrap;}
+  .kbnbadge.sei{background:var(--rail); color:var(--rail-ink);}
+  .kbnbadge.part{background:var(--rail-accent); color:var(--ink);}
 
   .homearrow{color:var(--dim); font-weight:700; text-decoration:none;}
   .homefooter{font-size:12px; color:var(--dim); padding:10px 2px 0; border-top:1px dashed var(--line); margin-top:4px;}
@@ -745,6 +752,13 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
     });
+  }
+
+  // 雇用区分（正社員/パート）をひと目で見分けられるバッジにする（2026-10-17、ユーザー要望で追加）
+  function kbnBadge_(kbn){
+    if (!kbn) return '—';
+    var cls = kbn.indexOf('正社員') !== -1 ? 'sei' : 'part';
+    return '<span class="kbnbadge ' + cls + '">' + escapeHtml(kbn) + '</span>';
   }
 
   // IDトークンの中身はUTF-8。atob()は1バイトずつ文字にするだけなので、そのままだと
@@ -1278,7 +1292,7 @@
       var curMonth = r.monthly[CURRENT_MONTH_IDX];
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(r.koyouKbn || '—') + '</td>' +
+        '<td>' + kbnBadge_(r.koyouKbn) + '</td>' +
         '<td class="mono">' + minToHhmm_(stats.sumMin) + '</td>' +
         '<td class="mono ' + zan36Class + '">' + minToHhmm_(stats.zan36Min) + '</td>' +
         '<td class="mono ' + excessClass + '">' + (stats.excess60Min > 0 ? minToHhmm_(stats.excess60Min) : '—') + '</td>' +
@@ -1298,7 +1312,7 @@
     var r = ZANGYOU_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
     var stats = computeZangyouStats(r);
     document.getElementById('z-name').textContent = r.name;
-    document.getElementById('z-koyou').textContent = r.koyouKbn || '—';
+    document.getElementById('z-koyou').innerHTML = kbnBadge_(r.koyouKbn);
     document.getElementById('z-nenkan').textContent = minToHhmm_(stats.sumMin);
     document.getElementById('z-zan36').textContent = minToHhmm_(stats.zan36Min);
     document.getElementById('z-excess60').textContent = stats.excess60Min > 0 ? minToHhmm_(stats.excess60Min) : '—';
@@ -1357,7 +1371,7 @@
       tr.dataset.email = r.email;
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(r.koyouKbn || '—') + '</td>' +
+        '<td>' + kbnBadge_(r.koyouKbn) + '</td>' +
         '<td class="mono">' + escapeHtml(r.teijiStart || '—') + '〜' + escapeHtml(r.teijiEnd || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.nyushaDate || '—') + '</td>' +
         '<td>' + escapeHtml(r.workDays || '毎平日') + '</td>' +
@@ -1379,7 +1393,7 @@
     document.getElementById('m-name').textContent = r.name;
     document.getElementById('m-furigana').textContent = r.furigana || '—';
     document.getElementById('m-email').textContent = r.email;
-    document.getElementById('m-koyou').textContent = r.koyouKbn || '—';
+    document.getElementById('m-koyou').innerHTML = kbnBadge_(r.koyouKbn);
     document.getElementById('m-teiji').textContent = (r.teijiStart || '—') + '〜' + (r.teijiEnd || '—');
     document.getElementById('m-nyusha').textContent = r.nyushaDate || '—';
     document.getElementById('m-workdays').textContent = r.workDays || '毎平日';
@@ -1734,7 +1748,7 @@
   }
 
   // ── 月次集計（閲覧専用。給与じまん入力用の固定31列シートをそのまま表示） ──
-  var GESSHU_HEADERS = [], GESSHU_ROWS = [];
+  var GESSHU_HEADERS = [], GESSHU_ROWS = [], GESSHU_COLUMN_COLORS = [];
   var gState = { label:'', name:'' };
 
   function gMatches(r){ return !gState.name || r.values[0] === gState.name; }
@@ -1758,7 +1772,9 @@
       var tr = document.createElement('tr');
       tr.innerHTML = r.values.map(function(v, i){
         var text = (v === null || v === undefined) ? '' : String(v);
-        return '<td class="' + (i === 0 ? 'name' : 'mono') + '">' + escapeHtml(text) + '</td>';
+        // 基本情報/勤/怠/管理用の列グループを、シート本体と同じ色でひと目で分かるようにする
+        var bg = GESSHU_COLUMN_COLORS[i] ? ' style="background:' + GESSHU_COLUMN_COLORS[i] + ';"' : '';
+        return '<td class="' + (i === 0 ? 'name' : 'mono') + '"' + bg + '>' + escapeHtml(text) + '</td>';
       }).join('');
       tbody.appendChild(tr);
     });
@@ -1781,6 +1797,7 @@
           if (!data.success) { showToast(data.error || '月次集計の取得に失敗しました。', true); return; }
           GESSHU_HEADERS = data.headers || [];
           GESSHU_ROWS = data.rows || [];
+          GESSHU_COLUMN_COLORS = data.columnColors || [];
           populateGesshuNameDropdown();
           renderGesshuTable();
         })
@@ -1789,7 +1806,7 @@
   }
 
   // ── 週別実働（閲覧専用。週数が月によって変動するため週ラベル・列見出しもサーバーから受け取る） ──
-  var SHUUBETSU_WEEKS = [], SHUUBETSU_ROWS = [];
+  var SHUUBETSU_WEEKS = [], SHUUBETSU_ROWS = [], SHUUBETSU_SUBCOL_COLORS = [];
   var wState = { label:'', name:'' };
 
   function wMatches(r){ return !wState.name || r.name === wState.name; }
@@ -1823,9 +1840,12 @@
     tbody.innerHTML = '';
     filtered.forEach(function(r){
       var tr = document.createElement('tr');
-      var cells = '<td class="name">' + escapeHtml(r.name) + '</td><td>' + escapeHtml(r.koyouKbn || '—') + '</td>';
+      var cells = '<td class="name">' + escapeHtml(r.name) + '</td><td>' + kbnBadge_(r.koyouKbn) + '</td>';
       r.weeks.forEach(function(week){
-        cells += week.map(function(v){ return '<td class="mono">' + escapeHtml(v || '—') + '</td>'; }).join('');
+        cells += week.map(function(v, si){
+          var bg = SHUUBETSU_SUBCOL_COLORS[si] ? ' style="background:' + SHUUBETSU_SUBCOL_COLORS[si] + ';"' : '';
+          return '<td class="mono"' + bg + '>' + escapeHtml(v || '—') + '</td>';
+        }).join('');
       });
       tr.innerHTML = cells;
       tbody.appendChild(tr);
@@ -1849,6 +1869,7 @@
           if (!data.success) { showToast(data.error || '週別実働の取得に失敗しました。', true); return; }
           SHUUBETSU_WEEKS = data.weeks || [];
           SHUUBETSU_ROWS = data.rows || [];
+          SHUUBETSU_SUBCOL_COLORS = data.subColColors || [];
           populateShuubetsuNameDropdown();
           renderShuubetsuTable();
         })
@@ -1884,7 +1905,7 @@
 
     var thead = document.getElementById('dakokukakunin-thead');
     thead.innerHTML =
-      '<tr><th colspan="2" rowspan="2">日付</th>' +
+      '<tr><th colspan="2" rowspan="2" class="dk-corner">日付</th>' +
         empIdxs.map(function(i){ return '<th colspan="3">' + escapeHtml(allNames[i] || '—') + '</th>'; }).join('') +
       '</tr><tr>' +
         empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th>備考</th>'; }).join('') +
@@ -1900,8 +1921,8 @@
       var tr = document.createElement('tr');
       var dateStyle = dkStyle_(day.dateBg, day.dateFc);
       var cells =
-        '<td class="mono" style="' + dateStyle + '">' + escapeHtml(day.date) + '</td>' +
-        '<td class="mono" style="' + dateStyle + '">' + escapeHtml(day.dow) + '</td>';
+        '<td class="mono dk-col0" style="' + dateStyle + '">' + escapeHtml(day.date) + '</td>' +
+        '<td class="mono dk-col1" style="' + dateStyle + '">' + escapeHtml(day.dow) + '</td>';
       empIdxs.forEach(function(i){
         var emp = day.employees[i] || {};
         cells +=
@@ -1915,6 +1936,19 @@
     document.getElementById('dakokukakunin-emptystate').hidden = (data.days || []).length > 0;
     document.getElementById('dakokukakunin-resultcount').textContent =
       (data.days || []).length + ' 日分（' + (pickedIdx !== -1 ? '1名表示中' : '全' + allNames.length + '名') + '）';
+
+    // 日付・曜日列（A・B列相当）を横スクロールでも追従するよう固定する
+    // （実際のシートもsetFrozenColumns(2)で固定している。2026-10-17ユーザー要望）
+    var firstTr = tbody.rows[0];
+    if (firstTr) {
+      var col0Width = firstTr.cells[0].offsetWidth;
+      Array.from(tbody.rows).forEach(function(r){
+        r.cells[0].style.left = '0px';
+        r.cells[1].style.left = col0Width + 'px';
+      });
+      var cornerTh = thead.rows[0].cells[0];
+      cornerTh.style.left = '0px';
+    }
   }
 
   document.getElementById('fk-name').addEventListener('change', function(e){ kState.name = e.target.value; renderDakokuKakuninTable(); });
