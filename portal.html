@@ -256,8 +256,24 @@
       </div>
     </div>
 
-    <div id="page-dakoku" hidden><div class="pagehead"><h1>打刻ログ</h1></div>
-      <div class="stub"><b>打刻ログ</b>社員・日付での検索、出勤/退勤/中抜けの一覧表示を予定しています。</div></div>
+    <div id="page-dakoku" hidden>
+      <div class="pagehead"><h1>打刻ログ</h1><span class="sub">DAKOKU-LOG / RAW RECORDS</span></div>
+      <div class="filterbar">
+        <div class="f grow"><label>氏名</label><select id="fd-name"><option value="">すべて</option></select></div>
+        <div class="f"><label>種別</label><select id="fd-type"><option value="">すべて</option>
+          <option>出勤</option><option>退勤</option><option>外出</option><option>帰社</option></select></div>
+        <div class="f"><label>日付</label><input type="date" id="fd-date"></div>
+        <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="dakoku-refresh">再読み込み</button></div>
+      </div>
+      <p class="resultcount" id="dakoku-resultcount"></p>
+      <div class="sheet">
+        <table>
+          <thead><tr><th>日時</th><th>氏名</th><th>種別</th><th>実打刻時刻</th><th>集計用時刻</th><th>備考</th></tr></thead>
+          <tbody id="dakoku-tbody"></tbody>
+        </table>
+        <div class="emptystate" id="dakoku-emptystate" hidden>条件に一致する打刻がありません。</div>
+      </div>
+    </div>
     <div id="page-shuukei" hidden><div class="pagehead"><h1>月次集計・36協定</h1></div>
       <div class="stub"><b>月次集計・残業・36協定</b>既存の集計シートの数値を見やすく表示する画面を予定しています。</div></div>
     <div id="page-shain" hidden><div class="pagehead"><h1>社員マスタ</h1></div>
@@ -507,6 +523,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3600);
   }
 
+  var dakokuLoaded = false;
   document.querySelectorAll('.rail nav button').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.rail nav button').forEach(function(b){ b.classList.remove('active'); });
@@ -514,6 +531,8 @@
       ['shinsei','dakoku','shuukei','shain'].forEach(function(name){
         document.getElementById('page-' + name).hidden = (name !== btn.dataset.nav);
       });
+      // 打刻ログは初めてタブを開いた時だけ読み込む（ログイン直後の表示を軽くするため）
+      if (btn.dataset.nav === 'dakoku' && !dakokuLoaded) { dakokuLoaded = true; loadDakokuList(); }
     });
   });
 
@@ -529,6 +548,63 @@
         });
         populateFilterDropdowns();
         render();
+      })
+      .catch(function(){ showToast('通信エラーが発生しました。', true); });
+  }
+
+  // ── 打刻ログ（簡易検索。打刻確認シートの月次異常表示を置き換えるものではない） ──
+  var DAKOKU_ROWS = [];
+  var dState = { name:'', type:'', date:'' };
+
+  function dMatches(r){
+    if (dState.name && r.name !== dState.name) return false;
+    if (dState.type && r.dakokuType !== dState.type) return false;
+    if (dState.date && normDate(r.dakokuDateTime).indexOf(normDate(dState.date)) !== 0) return false;
+    return true;
+  }
+
+  function populateDakokuDropdown(){
+    var nameSel = document.getElementById('fd-name');
+    var names = Array.from(new Set(DAKOKU_ROWS.map(function(r){ return r.name; }))).sort(function(a, b){ return a.localeCompare(b, 'ja'); });
+    nameSel.innerHTML = '<option value="">すべて</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join('');
+    nameSel.value = names.indexOf(dState.name) !== -1 ? dState.name : '';
+    dState.name = nameSel.value;
+  }
+
+  function renderDakoku(){
+    var tbody = document.getElementById('dakoku-tbody');
+    var filtered = DAKOKU_ROWS.filter(dMatches);
+    tbody.innerHTML = '';
+    filtered.forEach(function(r){
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="mono">' + escapeHtml(r.dakokuDateTime) + '</td>' +
+        '<td class="name">' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.dakokuType) + '</td>' +
+        '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
+        '<td class="mono">' + escapeHtml(r.shuukeiTime || '—') + '</td>' +
+        '<td>' + escapeHtml(r.biko || '') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('dakoku-emptystate').hidden = filtered.length > 0;
+    document.getElementById('dakoku-resultcount').textContent = filtered.length + ' 件（全' + DAKOKU_ROWS.length + '件中）';
+  }
+
+  document.getElementById('fd-name').addEventListener('change', function(e){ dState.name = e.target.value; renderDakoku(); });
+  document.getElementById('fd-type').addEventListener('change', function(e){ dState.type = e.target.value; renderDakoku(); });
+  document.getElementById('fd-date').addEventListener('change', function(e){ dState.date = e.target.value; renderDakoku(); });
+  document.getElementById('dakoku-refresh').addEventListener('click', function(){ loadDakokuList(); });
+
+  function loadDakokuList(){
+    document.getElementById('dakoku-resultcount').textContent = '読み込み中…';
+    fetch(GAS_URL + '?mode=portalDakokuList&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) { showToast(data.error || '打刻ログの取得に失敗しました。', true); return; }
+        DAKOKU_ROWS = data.rows || [];
+        populateDakokuDropdown();
+        renderDakoku();
       })
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
