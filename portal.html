@@ -234,7 +234,7 @@
       <button class="active" data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
       <button data-nav="shusei"><span class="ic">🛠️</span>修正依頼</button>
       <button data-nav="dakoku"><span class="ic">🕒</span>打刻ログ</button>
-      <button data-nav="shuukei"><span class="ic">📊</span>月次集計・36協定</button>
+      <button data-nav="shuukei"><span class="ic">📊</span>36協定</button>
       <button data-nav="shain"><span class="ic">👤</span>社員マスタ</button>
     </nav>
     <div class="who" id="signedInAs"></div>
@@ -321,7 +321,7 @@
       </div>
     </div>
     <div id="page-shuukei" hidden>
-      <div class="pagehead"><h1>月次集計・36協定</h1><span class="sub">ZANGYOU-36 / YEAR TO DATE</span></div>
+      <div class="pagehead"><h1>36協定</h1><span class="sub">ZANGYOU-36 / YEAR TO DATE</span></div>
       <div class="filterbar">
         <div class="f grow"><label>氏名</label><select id="fz-name"><option value="">すべて</option></select></div>
         <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="zangyou-refresh">再読み込み</button></div>
@@ -829,12 +829,40 @@
       .catch(function(){ showToast('通信エラーが発生しました。', true); });
   }
 
-  // ── 月次集計・36協定（閲覧専用。年間残業・36協定シートをそのまま表示） ──
+  // ── 36協定（閲覧専用。年間残業・36協定シートをそのまま表示） ──
   var ZANGYOU_ROWS = [];
   var zState = { name:'' };
   var CURRENT_MONTH_IDX = new Date().getMonth(); // 0始まり（配列インデックスと一致）
+  var KYOTEI_NEN_MIN = 360 * 60; // 36協定：年間上限（RULE.KYOTEI_NEN_H、設定.gs）
+  var KYOTEI_TSUKI_60H_MIN = 60 * 60; // 月60h超（割増率変更ライン）
 
   function zMatches(r){ return !zState.name || r.name === zState.name; }
+
+  // "50:00"のようなhh:mm文字列を分に変換（空欄はnull）
+  function hhmmToMin_(s){
+    if (!s) return null;
+    var m = String(s).match(/^(\d+):(\d\d)$/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+  function minToHhmm_(min){
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + ':' + String(m).padStart(2, '0');
+  }
+
+  // 年間残業累計・36協定年間残り・月60h超累計は、シート側のD〜F列をそのまま信用せず、
+  // 月別12ヶ月分（G〜R列）から都度このポータル側で計算し直す。D〜F列はcheck36Alertが
+  // 対象月を処理した時にしか更新されないため、表示中の月別内訳と数字が食い違って見える
+  // ことがあった（ユーザー指摘：「年間残業合計が合計されていない」）
+  function computeZangyouStats(r){
+    var sumMin = 0, excess60Min = 0;
+    r.monthly.forEach(function(m){
+      var mm = hhmmToMin_(m.value) || 0;
+      sumMin += mm;
+      if (mm > KYOTEI_TSUKI_60H_MIN) excess60Min += (mm - KYOTEI_TSUKI_60H_MIN);
+    });
+    return { sumMin: sumMin, zan36Min: Math.max(0, KYOTEI_NEN_MIN - sumMin), excess60Min: excess60Min };
+  }
 
   function populateZangyouDropdown(){
     var nameSel = document.getElementById('fz-name');
@@ -852,17 +880,17 @@
     filtered.forEach(function(r){
       var tr = document.createElement('tr');
       tr.dataset.email = r.email;
-      // E列（36協定年間残り）50時間未満は赤、F列（月60h超累計）0超はオレンジ（GAS側の色分けと同じ基準）
-      var zan36Min = hhmmToMin_(r.zan36), excess60Min = hhmmToMin_(r.excess60);
-      var zan36Class = (zan36Min !== null && zan36Min < 50 * 60) ? 'warn-bad' : '';
-      var excessClass = (excess60Min !== null && excess60Min > 0) ? 'warn-caution' : '';
+      var stats = computeZangyouStats(r);
+      // 36協定年間残り50時間未満は赤、月60h超累計が0超はオレンジ（GAS側の色分けと同じ基準）
+      var zan36Class = stats.zan36Min < 50 * 60 ? 'warn-bad' : '';
+      var excessClass = stats.excess60Min > 0 ? 'warn-caution' : '';
       var curMonth = r.monthly[CURRENT_MONTH_IDX];
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.koyouKbn || '—') + '</td>' +
-        '<td class="mono">' + escapeHtml(r.nenkanMin || '—') + '</td>' +
-        '<td class="mono ' + zan36Class + '">' + escapeHtml(r.zan36 || '—') + '</td>' +
-        '<td class="mono ' + excessClass + '">' + escapeHtml(r.excess60 || '—') + '</td>' +
+        '<td class="mono">' + minToHhmm_(stats.sumMin) + '</td>' +
+        '<td class="mono ' + zan36Class + '">' + minToHhmm_(stats.zan36Min) + '</td>' +
+        '<td class="mono ' + excessClass + '">' + (stats.excess60Min > 0 ? minToHhmm_(stats.excess60Min) : '—') + '</td>' +
         '<td class="mono">' + escapeHtml((curMonth && curMonth.value) || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.heikin || '—') + '</td>';
       tbody.appendChild(tr);
@@ -871,25 +899,18 @@
     document.getElementById('zangyou-resultcount').textContent = filtered.length + ' 名（全' + ZANGYOU_ROWS.length + '名中）';
   }
 
-  // "50:00"のようなhh:mm文字列を分に変換（空欄はnull）
-  function hhmmToMin_(s){
-    if (!s) return null;
-    var m = String(s).match(/^(\d+):(\d\d)$/);
-    if (!m) return null;
-    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  }
-
   document.getElementById('fz-name').addEventListener('change', function(e){ zState.name = e.target.value; renderZangyou(); });
   document.getElementById('zangyou-refresh').addEventListener('click', function(){ loadZangyouList(); });
 
   var zDrawer = document.getElementById('z-drawer'), zBackdrop = document.getElementById('z-backdrop');
   function openZangyouDrawer(email){
     var r = ZANGYOU_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
+    var stats = computeZangyouStats(r);
     document.getElementById('z-name').textContent = r.name;
     document.getElementById('z-koyou').textContent = r.koyouKbn || '—';
-    document.getElementById('z-nenkan').textContent = r.nenkanMin || '—';
-    document.getElementById('z-zan36').textContent = r.zan36 || '—';
-    document.getElementById('z-excess60').textContent = r.excess60 || '—';
+    document.getElementById('z-nenkan').textContent = minToHhmm_(stats.sumMin);
+    document.getElementById('z-zan36').textContent = minToHhmm_(stats.zan36Min);
+    document.getElementById('z-excess60').textContent = stats.excess60Min > 0 ? minToHhmm_(stats.excess60Min) : '—';
     document.getElementById('z-heikin').textContent = r.heikin || '—';
     document.getElementById('z-months').innerHTML = r.monthly.map(function(m, idx){
       return '<div class="mbox' + (idx === CURRENT_MONTH_IDX ? ' current' : '') + '">' +
