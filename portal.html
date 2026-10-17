@@ -229,11 +229,11 @@
       <div class="filterbar">
         <div class="f"><label>申請ID</label><select id="f-id"><option value="">すべて</option></select></div>
         <div class="f grow"><label>氏名</label><select id="f-name"><option value="">すべて</option></select></div>
-        <div class="f"><label>有給種別</label><select id="f-ykbn"><option value="">すべて</option></select></div>
-        <div class="f"><label>対象日</label><input type="date" id="f-date"></div>
-        <div class="f"><label>種別</label>
+        <div class="f"><label>種別</label><select id="f-ykbn"><option value="">すべて</option></select></div>
+        <div class="f"><label>種別・内容</label>
           <select id="f-type"><option value="">すべて</option><option value="yukyu">有給・遅刻・早退・特別休暇</option>
             <option value="zangyou">残業</option><option value="chokkou">直行・直帰・出張</option></select></div>
+        <div class="f"><label>対象日</label><input type="date" id="f-date"></div>
         <div class="f"><label>状況</label>
           <div class="pills" id="f-status">
             <button class="pill" aria-pressed="true" data-status="">すべて</button>
@@ -249,7 +249,7 @@
 
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th>有給種別</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th>種別</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
@@ -271,7 +271,7 @@
   <h2 id="d-name"></h2>
   <div class="appid" id="d-appid"></div>
   <dl>
-    <dt>有給種別</dt><dd id="d-ykbn"></dd>
+    <dt>種別</dt><dd id="d-ykbn"></dd>
     <dt>種別・内容</dt><dd id="d-type"></dd>
     <dt>対象日</dt><dd id="d-date"></dd>
     <dt>事前/事後</dt><dd id="d-jizen"></dd>
