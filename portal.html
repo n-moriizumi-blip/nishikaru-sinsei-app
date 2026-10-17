@@ -53,9 +53,16 @@
   #denied{display:none; font-size:13px; color:var(--denied); text-align:center; line-height:1.7;}
   #loadingNote{display:none; font-size:12.5px; color:var(--dim); text-align:center;}
 
-  .app{display:none; grid-template-columns:64px 1fr; min-height:100%;}
-  .rail{background:var(--rail); border-right:1px solid #16293A; overflow:hidden; width:64px; transition:width .16s ease;}
-  .app:hover .rail{width:196px;}
+  /* 2026-10-17修正：以前は.app（画面全体）にマウスが乗るだけでレールが展開してしまい、
+     かつ展開後の幅がグリッド枠を無視して本文と重なっていた。レール自体を position:fixed で
+     浮かせ、レールにマウスが乗った時だけ本文の上に重ねて展開する方式に変更。
+     .rail-spacerが常に64px分の余白を確保するので、本文側は展開の影響を受けない */
+  .app{display:none; min-height:100%;}
+  .app.show{display:flex;}
+  .rail-spacer{width:64px; flex-shrink:0;}
+  .rail{background:var(--rail); border-right:1px solid #16293A; overflow:hidden; width:64px; transition:width .16s ease;
+    position:fixed; top:0; left:0; bottom:0; z-index:50;}
+  .rail:hover{width:196px; box-shadow:6px 0 22px rgba(0,0,0,.22);}
   .rail-inner{width:196px; padding:16px 10px; height:100%; display:flex; flex-direction:column;}
   .rail .brand{display:flex; align-items:center; gap:10px; padding:0 8px; margin-bottom:22px; white-space:nowrap;}
   .rail .brand .mark{width:30px; height:30px; border-radius:6px; background:var(--rail-field); border:1px solid rgba(255,255,255,.16);
@@ -74,7 +81,7 @@
   .rail .who{margin-top:auto; padding:12px 9px 2px; font-size:10.5px; color:var(--rail-dim); border-top:1px solid rgba(255,255,255,.14);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
-  .main{padding:22px 24px 60px; min-width:0;}
+  .main{flex:1; min-width:0; padding:22px 24px 60px;}
   .pagehead{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;}
   .pagehead h1{font-family:var(--display); font-weight:900; font-size:18px; margin:0; color:var(--ink);}
   .pagehead .sub{font-size:11.5px; color:var(--dim); font-family:var(--mono);}
@@ -166,9 +173,10 @@
   .toast.err{background:var(--denied);}
 
   @media (max-width:720px){
-    .app{grid-template-columns:1fr;}
-    .rail{width:100%; position:sticky; top:0; z-index:15;}
-    .app:hover .rail{width:100%;}
+    .app{flex-direction:column;}
+    .rail-spacer{display:none;}
+    .rail{position:sticky; top:0; left:auto; bottom:auto; width:100%; z-index:15;}
+    .rail:hover{width:100%; box-shadow:none;}
     .rail-inner{width:100%;}
     .rail nav{flex-direction:row; overflow-x:auto;}
     .rail button{width:auto;}
@@ -202,6 +210,7 @@
 </div>
 
 <div class="app" id="app">
+  <div class="rail-spacer"></div>
   <div class="rail"><div class="rail-inner">
     <div class="brand"><div class="mark">西</div><div class="tx">勤怠管理<br>ポータル<small>西軽精機・総務課</small></div></div>
     <nav>
@@ -480,7 +489,7 @@
           return;
         }
         document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'grid';
+        document.getElementById('app').classList.add('show');
         document.getElementById('signedInAs').textContent = 'ログイン中：' + myEmail;
         loadShinseiList();
       })
