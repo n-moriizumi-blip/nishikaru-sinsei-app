@@ -276,6 +276,7 @@
     <dt>対象日</dt><dd id="d-date"></dd>
     <dt>事前/事後</dt><dd id="d-jizen"></dd>
     <dt>判定</dt><dd id="d-status"></dd>
+    <div id="d-extra"></div>
     <dt>理由・備考</dt><dd><div class="reason" id="d-reason"></div></dd>
   </dl>
   <div class="drawer-actions" id="d-actions"></div>
@@ -306,6 +307,18 @@
 
   var STAMP = {'承認待':['pending','待'], '仮承認':['provisional','仮'], '承認済':['approved','済'], '否認':['denied','否']};
 
+  // 詳細ドロワーの固定項目（種別・対象日等）以外に、値が入っている時だけ追加表示する
+  // シートの残りの列。申請種別によってどの列が使われるかが違うため、空欄のものは出さない
+  var EXTRA_FIELDS = [
+    ['appDateTime',    '申請日時'],
+    ['hiruKyukei',     '昼休憩'],
+    ['gogoKyukei',     '午後休憩'],
+    ['jitsuZangyou',   '実残業時間'],
+    ['tokubetsuKisan', '特別休暇起算日'],
+    ['tokubetsuDetail','特別休暇詳細'],
+    ['zokugara',       '続柄'],
+  ];
+
   // サーバーから返ってくる生データ（COL_SHINSEIの値）を、画面表示用の形に変換する
   var CHOKKOU_TYPES = ['直行のみ', '直帰のみ', '直行・直帰'];
   function categoryOf(r){
@@ -314,7 +327,10 @@
     return 'yukyu';
   }
   function buildDetail(r){
-    if (r.shinsei === '残業') return (r.startTime && r.endTime) ? (r.startTime + '〜' + r.endTime + ' 予定') : '残業';
+    if (r.shinsei === '残業') {
+      if (r.jitsuZangyou) return '実績 ' + r.jitsuZangyou;
+      return (r.startTime && r.endTime) ? (r.startTime + '〜' + r.endTime + ' 予定') : '残業';
+    }
     if (CHOKKOU_TYPES.indexOf(r.shinsei) !== -1) return r.shinsei;
     if (r.yukyuKbn && r.yukyuKbn.indexOf('特別休暇') !== -1) return r.yukyuKbn;
     if (r.yukyuKbn === '傷病等特別休暇') return r.yukyuKbn;
@@ -430,6 +446,11 @@
     var st = STAMP[r.status] || ['pending', escapeHtml(r.status || '?')];
     document.getElementById('d-status').innerHTML = '<span class="stamp ' + st[0] + '">' + st[1] + '</span>';
     document.getElementById('d-reason').textContent = r.riyu || '（記入なし）';
+    document.getElementById('d-extra').innerHTML = EXTRA_FIELDS.map(function(f){
+      var v = r[f[0]];
+      if (!v) return '';
+      return '<dt>' + f[1] + '</dt><dd>' + escapeHtml(v) + '</dd>';
+    }).join('');
     document.getElementById('d-actions').innerHTML = actionsFor(r.status, 'drawer').map(function(a){
       return '<button class="' + a[0] + '" data-act="' + a[1] + '" data-id="' + escapeHtml(r.appId) + '">' + a[2] + '</button>';
     }).join('');
