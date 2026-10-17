@@ -1116,7 +1116,7 @@
       var zanzanClass = r.zanzanNissu < 5 ? 'warn-bad' : '';
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td class="mono">' + (Math.round(r.kinzokuNen * 10) / 10) + '年</td>' +
+        '<td class="mono">' + escapeHtml(r.kinzokuNen || '—') + '</td>' +
         '<td class="mono">' + fmtDay_(r.fuyoNissu) + '</td>' +
         '<td class="mono ' + zanzanClass + '">' + fmtDay_(r.zanzanNissu) + '</td>' +
         '<td class="mono">' + fmtDay_(r.shokaNissu) + '</td>' +
@@ -1135,7 +1135,7 @@
   function openYukyuDrawer(email){
     var r = YUKYU_ROWS.find(function(x){ return x.email === email; }); if (!r) return;
     document.getElementById('y-name').textContent = r.name;
-    document.getElementById('y-kinzoku').textContent = '勤続' + (Math.round(r.kinzokuNen * 10) / 10) + '年';
+    document.getElementById('y-kinzoku').textContent = '勤続' + (r.kinzokuNen || '—');
     document.getElementById('y-fuyo').textContent = fmtDay_(r.fuyoNissu);
     document.getElementById('y-fuyozen').textContent = fmtDay_(r.fuyoZennen);
     document.getElementById('y-kurikoshi').textContent = fmtDay_(r.kurikoshi);
