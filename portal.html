@@ -307,6 +307,17 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .toast.err{background:var(--denied);}
 
+  /* ── 年度選択（レール上部、全タブ共通。2026-10-18新設） ── */
+  .rail .fiscalyear{display:flex; align-items:center; gap:13px; padding:0 9px; margin-bottom:14px; white-space:nowrap;}
+  .rail .fiscalyear .ic{font-size:16px; width:20px; text-align:center; flex-shrink:0;}
+  .fiscalyear-select{background:var(--rail-field); color:var(--rail-ink); border:1px solid rgba(255,255,255,.16);
+    border-radius:5px; padding:5px 6px; font-size:12px; font-family:var(--body); font-weight:700; width:150px; max-width:150px;}
+  .pastyearnote{display:none; background:var(--pending); color:#2B1D00; font-weight:700; font-size:12.5px;
+    padding:9px 16px; border-radius:7px; margin-bottom:14px;}
+  body.pastyear .pastyearnote{display:block;}
+  /* 過去の年度は閲覧専用：承認/否認・差し戻し・新規作成等の操作UIを隠す */
+  body.pastyear .rowbtns, body.pastyear .drawer-actions, body.pastyear #dengon-new{display:none;}
+
   @media (max-width:720px){
     .app{flex-direction:column;}
     .rail-spacer{display:none;}
@@ -315,6 +326,7 @@
     .rail-inner{width:100%;}
     .rail nav{flex-direction:row; overflow-x:auto;}
     .rail button{width:auto;}
+    .rail .fiscalyear{margin-bottom:8px;}
     .sheet{overflow-x:auto;}
     table{min-width:700px;}
   }
@@ -348,6 +360,7 @@
   <div class="rail-spacer"></div>
   <div class="rail"><div class="rail-inner">
     <div class="brand"><div class="mark">西</div><div class="tx">勤怠管理<br>ポータル<small>西軽精機・総務課</small></div></div>
+    <div class="fiscalyear"><span class="ic">📅</span><select id="fiscalyear-select" class="fiscalyear-select"><option value="">現在の年度</option></select></div>
     <nav>
       <button class="active" data-nav="home"><span class="ic">🏠</span>ホーム</button>
       <button data-nav="shinsei"><span class="ic">📋</span>申請一覧</button>
@@ -366,6 +379,7 @@
   </div></div>
 
   <div class="main">
+    <div class="pastyearnote" id="pastyearnote">📁 過去の年度を表示中です（閲覧専用。承認・否認や新規作成はできません）</div>
     <div id="page-home">
       <div class="pagehead">
         <h1>🏠 ホーム</h1>
@@ -773,6 +787,20 @@
 (function(){
   var GAS_URL = 'https://script.google.com/a/macros/nishikaru.co.jp/s/AKfycbzht6wuAjcOKeiGL20sHIEE1ip10b7haJfb5lFNahg7XN-ZBKZtwhxE3sfPhydCA21xYg/exec';
   var idToken = null, myEmail = '', myName = '';
+  // 2026-10-18新設：年度選択（過去の年度のスプレッドシートを閲覧する機能）。
+  // currentSsId=''は「現在の年度」、それ以外は過去年度のスプレッドシートID。
+  // 書き込み系（承認/否認・伝言板の新規作成等）のdoPostはssIdを一切見ないため、
+  // バックエンド側は常に現在の年度にしか書き込めない（isPastYearViewはUI側の安全策）
+  var currentSsId = '', isPastYearView = false, FISCAL_YEARS = [];
+  // mode=portal*系のGET用URLを組み立てる共通ヘルパー。年度選択中はssIdを自動で付ける
+  function portalApiUrl_(mode, extraParams){
+    var qs = 'mode=' + encodeURIComponent(mode) + '&token=' + encodeURIComponent(idToken);
+    if (currentSsId) qs += '&ssId=' + encodeURIComponent(currentSsId);
+    if (extraParams) {
+      Object.keys(extraParams).forEach(function(k){ qs += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(extraParams[k]); });
+    }
+    return GAS_URL + '?' + qs;
+  }
   var ROWS = [];
   var state = { id:'', name:'', ykbn:'', date:'', type:'', status:'' };
   var currentId = null;
@@ -963,6 +991,7 @@
   var STATUS_FOR_ACT = { approve:'承認済', deny:'否認', revert:'承認待' };
   function doAction(id, act){
     if (busy) return;
+    if (isPastYearView) { showToast('過去の年度は閲覧専用です。', true); return; }
     var r = ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
     var newStatus = STATUS_FOR_ACT[act];
     busy = true;
@@ -1083,6 +1112,54 @@
     }
   }
 
+  // ── 年度選択（過去の年度のスプレッドシートも閲覧できるようにする。2026-10-18新設） ──
+  function loadFiscalYears_(){
+    return fetch(GAS_URL + '?mode=portalFiscalYears&token=' + encodeURIComponent(idToken))
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (!data.success) return;
+        FISCAL_YEARS = data.years || [];
+        var sel = document.getElementById('fiscalyear-select');
+        sel.innerHTML = FISCAL_YEARS.map(function(y){
+          return '<option value="' + escapeHtml(y.ssId) + '">' + escapeHtml(y.label) + '</option>';
+        }).join('');
+        sel.value = currentSsId;
+      })
+      .catch(function(){});
+  }
+
+  // 年度を切り替えた時、今まで読み込んだ全タブのデータは古い年度のものなので「未読込」に戻し、
+  // 今開いているタブだけその場で読み直す（他のタブは次に開いた時に新しい年度で読み込まれる）
+  function resetAllTabsForYearChange_(){
+    shinseiLoaded = dakokuLoaded = shuseiLoaded = zangyouLoaded = shainLoaded = yukyuLoaded =
+      tokubetsuLoaded = dengonLoaded = gesshuLoaded = shuubetsuLoaded = dakokukakuninLoaded = false;
+    tabReady = {};
+    MONTHLY_LABELS = [];
+
+    var activeBtn = document.querySelector('.rail nav button.active');
+    var tab = activeBtn ? activeBtn.dataset.nav : 'home';
+    if (tab === 'home') { tabReady.home = loadHomeSummary(); }
+    else if (tab === 'shinsei') { shinseiLoaded = true; tabReady.shinsei = loadShinseiList(); }
+    else if (tab === 'dakoku') { dakokuLoaded = true; tabReady.dakoku = loadDakokuList(); }
+    else if (tab === 'shusei') { shuseiLoaded = true; tabReady.shusei = loadShuuseiList(); }
+    else if (tab === 'shuukei') { zangyouLoaded = true; tabReady.shuukei = loadZangyouList(); }
+    else if (tab === 'yukyu') { yukyuLoaded = true; tabReady.yukyu = loadYukyuList(); }
+    else if (tab === 'tokubetsu') { tokubetsuLoaded = true; loadTokubetsuList(); }
+    else if (tab === 'dengon') { dengonLoaded = true; loadDengonList(); }
+    else if (tab === 'gesshu') { gesshuLoaded = true; loadGesshuList(); }
+    else if (tab === 'shuubetsu') { shuubetsuLoaded = true; loadShuubetsuList(); }
+    else if (tab === 'dakokukakunin') { dakokukakuninLoaded = true; loadDakokuKakuninList(); }
+    else if (tab === 'shain') { shainLoaded = true; loadShainList(); }
+  }
+
+  document.getElementById('fiscalyear-select').addEventListener('change', function(e){
+    currentSsId = e.target.value;
+    isPastYearView = !!currentSsId;
+    document.body.classList.toggle('pastyear', isPastYearView);
+    showToast(isPastYearView ? '過去の年度を表示しています（閲覧専用）' : '現在の年度に戻りました');
+    resetAllTabsForYearChange_();
+  });
+
   function applyJumpFilter(tab, name, opts){
     if (tab === 'shinsei') {
       state.name = name;
@@ -1108,7 +1185,7 @@
 
   function loadShinseiList(){
     document.getElementById('resultcount').textContent = '読み込み中…';
-    return fetch(GAS_URL + '?mode=portalShinseiList&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalShinseiList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '一覧の取得に失敗しました。', true); return; }
@@ -1170,7 +1247,7 @@
 
   function loadDakokuList(){
     document.getElementById('dakoku-resultcount').textContent = '読み込み中…';
-    return fetch(GAS_URL + '?mode=portalDakokuList&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalDakokuList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '打刻ログの取得に失敗しました。', true); return; }
@@ -1267,6 +1344,7 @@
 
   function doShuseiAction(id, act){
     if (busy) return;
+    if (isPastYearView) { showToast('過去の年度は閲覧専用です。', true); return; }
     var r = SHUSEI_ROWS.find(function(x){ return x.appId === id; }); if (!r) return;
     var newStatus = STATUS_FOR_ACT[act];
     busy = true;
@@ -1297,7 +1375,7 @@
 
   function loadShuuseiList(){
     document.getElementById('shusei-resultcount').textContent = '読み込み中…';
-    return fetch(GAS_URL + '?mode=portalShuuseiList&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalShuuseiList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '修正依頼一覧の取得に失敗しました。', true); return; }
@@ -1416,7 +1494,7 @@
 
   function loadZangyouList(){
     document.getElementById('zangyou-resultcount').textContent = '読み込み中…';
-    return fetch(GAS_URL + '?mode=portalZangyou36List&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalZangyou36List'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1496,7 +1574,7 @@
 
   function loadShainList(){
     document.getElementById('shain-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalShainList&token=' + encodeURIComponent(idToken))
+    fetch(portalApiUrl_('portalShainList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || '社員マスタの取得に失敗しました。', true); return; }
@@ -1581,7 +1659,7 @@
 
   function loadYukyuList(){
     document.getElementById('yukyu-resultcount').textContent = '読み込み中…';
-    return fetch(GAS_URL + '?mode=portalYukyuList&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalYukyuList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1669,7 +1747,7 @@
 
   function loadTokubetsuList(){
     document.getElementById('tokubetsu-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalTokubetsuList&token=' + encodeURIComponent(idToken))
+    fetch(portalApiUrl_('portalTokubetsuList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1755,7 +1833,7 @@
   // ため、社員マスタ（社員マスタタブと共通のSHAIN_ROWS）を未読み込みならここで取得する
   function ensureShainRowsLoaded_(cb){
     if (SHAIN_ROWS.length > 0) { cb(); return; }
-    fetch(GAS_URL + '?mode=portalShainList&token=' + encodeURIComponent(idToken))
+    fetch(portalApiUrl_('portalShainList'))
       .then(function(res){ return res.json(); })
       .then(function(data){ if (data.success) SHAIN_ROWS = data.rows || []; cb(); })
       .catch(function(){ cb(); });
@@ -1782,6 +1860,7 @@
   var dgSending = false;
   document.getElementById('dc-send').addEventListener('click', function(){
     if (dgSending) return;
+    if (isPastYearView) { showToast('過去の年度は閲覧専用です。', true); return; }
     var name    = document.getElementById('dc-name').value;
     var sender  = document.getElementById('dc-sender').value.trim();
     var content = document.getElementById('dc-content').value.trim();
@@ -1805,7 +1884,7 @@
 
   function loadDengonList(){
     document.getElementById('dengon-resultcount').textContent = '読み込み中…';
-    fetch(GAS_URL + '?mode=portalDengonList&token=' + encodeURIComponent(idToken))
+    fetch(portalApiUrl_('portalDengonList'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'データの取得に失敗しました。', true); return; }
@@ -1821,7 +1900,7 @@
   var MONTHLY_LABELS = [];
   function ensureMonthlyLabelsLoaded_(cb){
     if (MONTHLY_LABELS.length > 0) { cb(); return; }
-    fetch(GAS_URL + '?mode=portalMonthlyLabels&token=' + encodeURIComponent(idToken))
+    fetch(portalApiUrl_('portalMonthlyLabels'))
       .then(function(res){ return res.json(); })
       .then(function(data){ if (data.success) MONTHLY_LABELS = data.labels || []; cb(); })
       .catch(function(){ cb(); });
@@ -1882,7 +1961,7 @@
     ensureMonthlyLabelsLoaded_(function(){
       gState.label = populateMonthlyLabelSelect_('fg-label', gState.label);
       if (!gState.label) { document.getElementById('gesshu-resultcount').textContent = '利用可能な月がありません。'; return; }
-      fetch(GAS_URL + '?mode=portalGesshuList&token=' + encodeURIComponent(idToken) + '&label=' + encodeURIComponent(gState.label))
+      fetch(portalApiUrl_('portalGesshuList', { label: gState.label }))
         .then(function(res){ return res.json(); })
         .then(function(data){
           if (!data.success) { showToast(data.error || '月次集計の取得に失敗しました。', true); return; }
@@ -1954,7 +2033,7 @@
     ensureMonthlyLabelsLoaded_(function(){
       wState.label = populateMonthlyLabelSelect_('fw-label', wState.label);
       if (!wState.label) { document.getElementById('shuubetsu-resultcount').textContent = '利用可能な月がありません。'; return; }
-      fetch(GAS_URL + '?mode=portalShuubetsuList&token=' + encodeURIComponent(idToken) + '&label=' + encodeURIComponent(wState.label))
+      fetch(portalApiUrl_('portalShuubetsuList', { label: wState.label }))
         .then(function(res){ return res.json(); })
         .then(function(data){
           if (!data.success) { showToast(data.error || '週別実働の取得に失敗しました。', true); return; }
@@ -2064,7 +2143,7 @@
     ensureMonthlyLabelsLoaded_(function(){
       kState.label = populateMonthlyLabelSelect_('fk-label', kState.label);
       if (!kState.label) { document.getElementById('dakokukakunin-resultcount').textContent = '利用可能な月がありません。'; return; }
-      fetch(GAS_URL + '?mode=portalDakokuKakuninList&token=' + encodeURIComponent(idToken) + '&label=' + encodeURIComponent(kState.label))
+      fetch(portalApiUrl_('portalDakokuKakuninList', { label: kState.label }))
         .then(function(res){ return res.json(); })
         .then(function(data){
           if (!data.success) { showToast(data.error || '打刻確認の取得に失敗しました。', true); return; }
@@ -2220,7 +2299,7 @@
 
   function loadHomeSummary(){
     document.getElementById('home-period').textContent = '対象期間：読み込み中…';
-    return fetch(GAS_URL + '?mode=portalHomeSummary&token=' + encodeURIComponent(idToken))
+    return fetch(portalApiUrl_('portalHomeSummary'))
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (!data.success) { showToast(data.error || 'ホーム画面の取得に失敗しました。', true); return; }
@@ -2251,6 +2330,7 @@
         document.getElementById('app').classList.add('show');
         document.getElementById('signedInAs').textContent = 'ログイン中：' + myEmail;
         tabReady.home = loadHomeSummary();
+        loadFiscalYears_();
       })
       .catch(function(){
         document.getElementById('loadingNote').style.display = 'none';
