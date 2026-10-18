@@ -111,15 +111,18 @@
   /* ── 検査票グリッド ── */
   .sheet{background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:auto; max-height:70vh;}
   table{width:100%; border-collapse:collapse; font-size:13px;}
-  thead th{text-align:left; font-size:10px; font-weight:700; color:var(--rail-ink); padding:10px 12px; letter-spacing:.07em;
+  thead th{text-align:center; font-size:10px; font-weight:700; color:var(--rail-ink); padding:10px 12px; letter-spacing:.07em;
     text-transform:uppercase; font-family:var(--mono); border-bottom:1.5px solid #16293A; background:var(--rail);
     white-space:nowrap; position:sticky; top:0; z-index:2; border-right:1px solid rgba(255,255,255,.14);}
   thead th:last-child{border-right:none;}
   tbody tr{border-bottom:1px solid var(--line); cursor:pointer;}
   tbody tr:last-child{border-bottom:none;}
   tbody tr:hover{background:var(--bg);}
-  td{padding:10px 12px; vertical-align:middle; border-right:1px solid var(--line);}
+  td{padding:10px 12px; vertical-align:middle; border-right:1px solid var(--line); text-align:center;}
   td:last-child{border-right:none;}
+  /* 備考・メッセージ内容・詳細等、長くなりがちな自由記述列だけ左詰め（ユーザー指示：
+     「基本的には中央揃え、左詰めの方が見やすいものだけ左詰め」） */
+  td.txtleft, th.txtleft{text-align:left;}
   /* ── 打刻確認：日付・曜日列を横スクロールでも固定表示（leftはJSで実測して設定） ── */
   .dk-col0, .dk-col1{position:sticky; z-index:1; border-right:1.5px solid #999999;}
   .dk-corner{position:sticky; z-index:4; border-right:1.5px solid #16293A;}
@@ -128,6 +131,11 @@
   .stickyname-head{position:sticky; left:0; z-index:4; border-right:1.5px solid #16293A;}
   td.mono{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--dim); font-size:12.5px;}
   td.name{font-weight:700; color:var(--ink);}
+  /* 項目の意味的なまとまりを区切る太めの縦線（例：36協定の基本情報/年間累計/当月指標） */
+  .zone-end{border-right:2px solid #8a8a8a;}
+  /* 有給管理：通常有給/積立有給の列グループを色分け */
+  td.yukyu-normal{background:#EAF1FB;}
+  td.yukyu-tsumitate{background:#FDF1E3;}
   .emptystate{padding:40px 20px; text-align:center; color:var(--dim); font-size:13px;}
 
   /* ── ハンコ風スタンプ ── */
@@ -142,10 +150,10 @@
   .stamp.denied{border-color:var(--denied); color:var(--denied);}
   /* ── 申請一覧・修正依頼：行全体も状況の色で薄く塗って、パッと見で分かるようにする
      （ユーザー指摘：「ステータスが分かりずらい」。.resolvedbadgeと同じ赤/緑の濃さに揃えた） ── */
-  tr.row-pending{border-left:4px solid var(--pending); background:#FBF3E2;}
-  tr.row-provisional{border-left:4px solid var(--provisional); background:#E8F2F4;}
-  tr.row-approved{border-left:4px solid var(--approved); background:#EAF3EC;}
-  tr.row-denied{border-left:4px solid var(--denied); background:#FBEAEA;}
+  tr.row-pending{border-left:4px solid var(--pending); background:#F5E6C7;}
+  tr.row-provisional{border-left:4px solid var(--provisional); background:#D4E9ED;}
+  tr.row-approved{border-left:4px solid var(--approved); background:#D3ECDE;}
+  tr.row-denied{border-left:4px solid var(--denied); background:#F6D3CF;}
 
   /* ── 打刻種別の色分け（打刻ログシートの出勤=緑/退勤=青/外出=黄/帰社=紫と同じ濃さ） ── */
   tr.type-shukkin{border-left:4px solid #274E13; background:#D9EAD3;}
@@ -379,7 +387,7 @@
               <div class="periodbadges" id="home-nashi-badges"></div>
             </div>
             <table>
-              <thead id="home-nashi-thead"><tr><th>日付</th><th>氏名</th><th>内容</th><th>解消済み</th></tr></thead>
+              <thead id="home-nashi-thead"><tr><th>日付</th><th>氏名</th><th class="txtleft">内容</th><th>解消済み</th></tr></thead>
               <tbody id="home-nashi-tbody"></tbody>
             </table>
             <div class="emptystate" id="home-nashi-empty" hidden>該当者はいません。</div>
@@ -431,7 +439,7 @@
 
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th>種別</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th>種別</th><th class="txtleft">種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
@@ -459,7 +467,7 @@
       <p class="resultcount" id="shusei-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th>内容</th><th>対象日</th><th>正しい時刻</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th class="txtleft">内容</th><th>対象日</th><th>正しい時刻</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="shusei-tbody"></tbody>
         </table>
         <div class="emptystate" id="shusei-emptystate" hidden>条件に一致する修正依頼がありません。</div>
@@ -478,7 +486,7 @@
       <p class="resultcount" id="dakoku-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>日時</th><th>氏名</th><th>種別</th><th>実打刻時刻</th><th>集計用時刻</th><th>備考</th></tr></thead>
+          <thead><tr><th>日時</th><th>氏名</th><th>種別</th><th>実打刻時刻</th><th>集計用時刻</th><th class="txtleft">備考</th></tr></thead>
           <tbody id="dakoku-tbody"></tbody>
         </table>
         <div class="emptystate" id="dakoku-emptystate" hidden>条件に一致する打刻がありません。</div>
@@ -493,7 +501,7 @@
       <p class="resultcount" id="zangyou-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>氏名</th><th>雇用区分</th><th>年間残業累計</th><th>36協定年間残り</th><th>月60h超累計</th><th>当月残業</th><th>複数月平均</th></tr></thead>
+          <thead><tr><th>氏名</th><th class="zone-end">雇用区分</th><th>年間残業累計</th><th>36協定年間残り</th><th class="zone-end">月60h超累計</th><th>当月残業</th><th>複数月平均</th></tr></thead>
           <tbody id="zangyou-tbody"></tbody>
         </table>
         <div class="emptystate" id="zangyou-emptystate" hidden>データがありません。</div>
@@ -509,7 +517,7 @@
       <p class="resultcount" id="yukyu-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>氏名</th><th>勤続年数</th><th>今年度付与日数</th><th>通常有給残日数</th><th>消化済み日数</th><th>積立有給残日数</th><th>積立有給消化日数</th></tr></thead>
+          <thead><tr><th>氏名</th><th class="zone-end">勤続年数</th><th>今年度付与日数</th><th>通常有給残日数</th><th class="zone-end">消化済み日数</th><th>積立有給残日数</th><th>積立有給消化日数</th></tr></thead>
           <tbody id="yukyu-tbody"></tbody>
         </table>
         <div class="emptystate" id="yukyu-emptystate" hidden>データがありません。</div>
@@ -528,7 +536,7 @@
       <p class="resultcount" id="tokubetsu-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>氏名</th><th>種別</th><th>詳細</th><th>起算日</th><th>付与日数</th><th>消化日数</th><th>残日数</th><th>使用期限</th><th>状況</th></tr></thead>
+          <thead><tr><th>氏名</th><th>種別</th><th class="txtleft">詳細</th><th>起算日</th><th>付与日数</th><th>消化日数</th><th>残日数</th><th>使用期限</th><th>状況</th></tr></thead>
           <tbody id="tokubetsu-tbody"></tbody>
         </table>
         <div class="emptystate" id="tokubetsu-emptystate" hidden>条件に一致するデータがありません。</div>
@@ -546,7 +554,7 @@
       <p class="resultcount" id="dengon-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>状況</th><th>宛先氏名</th><th>送信者</th><th>メッセージ内容</th><th>登録日時</th><th>確認日時</th></tr></thead>
+          <thead><tr><th>状況</th><th>宛先氏名</th><th>送信者</th><th class="txtleft">メッセージ内容</th><th>登録日時</th><th>確認日時</th></tr></thead>
           <tbody id="dengon-tbody"></tbody>
         </table>
         <div class="emptystate" id="dengon-emptystate" hidden>条件に一致するデータがありません。</div>
@@ -611,7 +619,7 @@
       <p class="resultcount" id="shain-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>氏名</th><th>雇用区分</th><th>定時</th><th>入社日</th><th>勤務曜日</th><th>テスト参加</th><th>備考</th></tr></thead>
+          <thead><tr><th>氏名</th><th>雇用区分</th><th>定時</th><th>入社日</th><th>勤務曜日</th><th>テスト参加</th><th class="txtleft">備考</th></tr></thead>
           <tbody id="shain-tbody"></tbody>
         </table>
         <div class="emptystate" id="shain-emptystate" hidden>条件に一致する社員がいません。</div>
@@ -890,7 +898,7 @@
         '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.yukyuKbn || '—') + '</td>' +
-        '<td>' + escapeHtml(r.detail) + '</td>' +
+        '<td class="txtleft">' + escapeHtml(r.detail) + '</td>' +
         '<td class="mono">' + escapeHtml(buildDateLabel(r)) + '</td>' +
         '<td>' + escapeHtml(r.jizenGo || '—') + '</td>' +
         '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
@@ -1136,7 +1144,7 @@
         '<td>' + escapeHtml(r.dakokuType) + '</td>' +
         '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.shuukeiTime || '—') + '</td>' +
-        '<td>' + escapeHtml(r.biko || '') + '</td>';
+        '<td class="txtleft">' + escapeHtml(r.biko || '') + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('dakoku-emptystate').hidden = filtered.length > 0;
@@ -1200,7 +1208,7 @@
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(buildShuseiDetail(r)) + '</td>' +
+        '<td class="txtleft">' + escapeHtml(buildShuseiDetail(r)) + '</td>' +
         '<td class="mono">' + escapeHtml(r.taishouDate || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
         '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
@@ -1346,12 +1354,20 @@
       // 行全体も同じ基準で薄く色付けして、警告対象をスクロール中でも見つけやすくする
       tr.className = zan36Class ? 'row-denied' : (excessClass ? 'row-pending' : '');
       var curMonth = r.monthly[CURRENT_MONTH_IDX];
+      // 36協定年間残りが少ない・月60h超累計があるものはバッジ表示にして、色だけの警告より
+      // 目立たせる（ユーザー要望：「色や枠線をフル活用して見やすくおしゃれに」）
+      var zan36Html = zan36Class
+        ? '<span class="levelbadge l60">' + minToHhmm_(stats.zan36Min) + '</span>'
+        : minToHhmm_(stats.zan36Min);
+      var excessHtml = excessClass
+        ? '<span class="levelbadge l45">' + minToHhmm_(stats.excess60Min) + '</span>'
+        : '—';
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + kbnBadge_(r.koyouKbn) + '</td>' +
+        '<td class="zone-end">' + kbnBadge_(r.koyouKbn) + '</td>' +
         '<td class="mono">' + minToHhmm_(stats.sumMin) + '</td>' +
-        '<td class="mono ' + zan36Class + '">' + minToHhmm_(stats.zan36Min) + '</td>' +
-        '<td class="mono ' + excessClass + '">' + (stats.excess60Min > 0 ? minToHhmm_(stats.excess60Min) : '—') + '</td>' +
+        '<td class="mono">' + zan36Html + '</td>' +
+        '<td class="mono zone-end">' + excessHtml + '</td>' +
         '<td class="mono">' + escapeHtml((curMonth && curMonth.value) || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.heikin || '—') + '</td>';
       tbody.appendChild(tr);
@@ -1432,7 +1448,7 @@
         '<td class="mono">' + escapeHtml(r.nyushaDate || '—') + '</td>' +
         '<td>' + escapeHtml(r.workDays || '毎平日') + '</td>' +
         '<td>' + (r.isTestSanka ? '<span class="statuspill approved">対象</span>' : '—') + '</td>' +
-        '<td>' + escapeHtml(r.biko || '') + '</td>';
+        '<td class="txtleft">' + escapeHtml(r.biko || '') + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('shain-emptystate').hidden = filtered.length > 0;
@@ -1505,17 +1521,20 @@
     filtered.forEach(function(r){
       var tr = document.createElement('tr');
       tr.dataset.email = r.email;
-      // 通常有給残日数5日未満は赤（ホームシート「③有給残日数が少ない社員」と同じ基準）
-      var zanzanClass = r.zanzanNissu < 5 ? 'warn-bad' : '';
-      tr.className = zanzanClass ? 'row-denied' : '';
+      // 通常有給残日数5日未満は赤バッジ（ホームシート「③有給残日数が少ない社員」と同じ基準）。
+      // 列の色分け（通常有給/積立有給）と衝突しないよう、行全体の色付けではなくこのセルだけ
+      // バッジにする（ユーザー要望：「注意や警告は別の方法で分けたい」）
+      var zanzanHtml = r.zanzanNissu < 5
+        ? '<span class="levelbadge l60">' + fmtDay_(r.zanzanNissu) + '</span>'
+        : fmtDay_(r.zanzanNissu);
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td class="mono">' + escapeHtml(r.kinzokuNen || '—') + '</td>' +
-        '<td class="mono">' + fmtDay_(r.fuyoNissu) + '</td>' +
-        '<td class="mono ' + zanzanClass + '">' + fmtDay_(r.zanzanNissu) + '</td>' +
-        '<td class="mono">' + fmtDay_(r.shokaNissu) + '</td>' +
-        '<td class="mono">' + fmtDay_(r.tsumitateZan) + '</td>' +
-        '<td class="mono">' + fmtDay_(r.tsumitateShoka) + '</td>';
+        '<td class="mono zone-end">' + escapeHtml(r.kinzokuNen || '—') + '</td>' +
+        '<td class="mono yukyu-normal">' + fmtDay_(r.fuyoNissu) + '</td>' +
+        '<td class="mono yukyu-normal">' + zanzanHtml + '</td>' +
+        '<td class="mono yukyu-normal zone-end">' + fmtDay_(r.shokaNissu) + '</td>' +
+        '<td class="mono yukyu-tsumitate">' + fmtDay_(r.tsumitateZan) + '</td>' +
+        '<td class="mono yukyu-tsumitate">' + fmtDay_(r.tsumitateShoka) + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('yukyu-emptystate').hidden = filtered.length > 0;
@@ -1595,7 +1614,7 @@
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.shinsei) + '</td>' +
-        '<td>' + escapeHtml(r.detail || '—') + '</td>' +
+        '<td class="txtleft">' + escapeHtml(r.detail || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.kisanDate || '—') + '</td>' +
         '<td class="mono">' + fmtDay_(r.fuyoNissu) + '</td>' +
         '<td class="mono">' + fmtDay_(r.shokaNissu) + '</td>' +
@@ -1688,7 +1707,7 @@
         '<td>' + dgBadge(r.showFlag) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.sender || '—') + '</td>' +
-        '<td>' + escapeHtml(r.content || '—') + '</td>' +
+        '<td class="txtleft">' + escapeHtml(r.content || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.entryDate || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.confirmDate || '—') + '</td>';
       tbody.appendChild(tr);
@@ -1968,7 +1987,7 @@
       '<tr><th colspan="2" rowspan="2" class="dk-corner">日付</th>' +
         empIdxs.map(function(i){ return '<th colspan="3">' + escapeHtml(allNames[i] || '—') + '</th>'; }).join('') +
       '</tr><tr>' +
-        empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th>備考</th>'; }).join('') +
+        empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th class="txtleft">備考</th>'; }).join('') +
       '</tr>';
     if (thead.rows.length === 2) {
       var h = thead.rows[0].offsetHeight;
@@ -1988,7 +2007,7 @@
         cells +=
           '<td class="mono" style="' + dkStyle_(emp.shukkinBg, emp.shukkinFc) + '">' + escapeHtml(emp.shukkin || '—') + '</td>' +
           '<td class="mono" style="' + dkStyle_(emp.taikinBg, emp.taikinFc) + '">' + escapeHtml(emp.taikin || '—') + '</td>' +
-          '<td style="' + dkStyle_(emp.bikoBg, emp.bikoFc) + '">' + escapeHtml(emp.biko || '') + '</td>';
+          '<td class="txtleft" style="' + dkStyle_(emp.bikoBg, emp.bikoFc) + '">' + escapeHtml(emp.biko || '') + '</td>';
       });
       tr.innerHTML = cells;
       tbody.appendChild(tr);
@@ -2092,7 +2111,7 @@
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.dateStr) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td>' + escapeHtml(r.content) + '</td>' +
+        '<td class="txtleft">' + escapeHtml(r.content) + '</td>' +
         '<td>' + badge + '</td>';
       tr.addEventListener('click', function(){ jumpToTab('dakoku', r.name, { date: r.dateStr.replace(/\//g, '-') }); });
       tbody.appendChild(tr);
