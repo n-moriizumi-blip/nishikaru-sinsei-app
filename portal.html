@@ -62,8 +62,8 @@
   .rail-spacer{width:64px; flex-shrink:0;}
   .rail{background:var(--rail); border-right:1px solid #16293A; overflow:hidden; width:64px; transition:width .16s ease;
     position:fixed; top:0; left:0; bottom:0; z-index:50;}
-  .rail:hover{width:196px; box-shadow:6px 0 22px rgba(0,0,0,.22);}
-  .rail-inner{width:196px; padding:16px 10px; height:100%; display:flex; flex-direction:column;}
+  .rail:hover{width:220px; box-shadow:6px 0 22px rgba(0,0,0,.22);}
+  .rail-inner{width:220px; padding:16px 10px; height:100%; display:flex; flex-direction:column;}
   .rail .brand{display:flex; align-items:center; gap:10px; padding:0 8px; margin-bottom:22px; white-space:nowrap;}
   .rail .brand .mark{width:30px; height:30px; border-radius:6px; background:var(--rail-field); border:1px solid rgba(255,255,255,.16);
     display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:900; font-size:13px; color:var(--rail-accent);
@@ -73,7 +73,7 @@
   .rail nav{display:flex; flex-direction:column; gap:3px;}
   .rail button{display:flex; align-items:center; gap:13px; background:none; border:none; color:var(--rail-dim);
     font-family:var(--body); font-size:13px; font-weight:700; padding:10px 9px; border-radius:7px; cursor:pointer;
-    text-align:left; white-space:nowrap; width:176px;}
+    text-align:left; white-space:nowrap; width:200px;}
   .rail button .ic{width:18px; text-align:center; font-size:14px; flex-shrink:0; filter:grayscale(1); opacity:.6;}
   .rail button.active{background:var(--rail-field); color:var(--rail-ink);}
   .rail button.active .ic{filter:none; opacity:1;}
@@ -308,15 +308,17 @@
   .toast.err{background:var(--denied);}
 
   /* ── 年度選択（レール上部、全タブ共通。2026-10-18新設） ──
-     レール内側（.rail-inner）は常に196px幅で、外側の.railが64px/196pxの「窓」として
+     レール内側（.rail-inner）は常に固定幅（220px）で、外側の.railが64px/220pxの「窓」として
      クリップする作り（ナビボタンの文字もこれで折りたたみ時に隠れている）。ボタンの文字は
      単なる文字なのでクリップされても何も見えないが、selectは自分の背景・枠線を持つため、
      窓の境目にその一部だけがはみ出して見えてしまっていた（ユーザー指摘：「はみ出て見えない」）。
-     折りたたみ時はopacity:0で完全に透明にし、レールにカーソルが乗った時だけ見せる */
+     ①折りたたみ時はopacity:0で完全に透明にし、レールにカーソルが乗った時だけ見せる。
+     ②それだけでは展開時もselect自体が収まりきらず入らなかったため、レール自体の展開幅を
+     196px→220pxに広げてselectの実際の幅も確保した（ユーザー指摘：「あまり変化が見られない」） */
   .rail .fiscalyear{display:flex; align-items:center; gap:13px; padding:0 9px; margin-bottom:14px; white-space:nowrap;}
   .rail .fiscalyear .ic{font-size:16px; width:20px; text-align:center; flex-shrink:0;}
   .fiscalyear-select{background:var(--rail-field); color:var(--rail-ink); border:1px solid rgba(255,255,255,.16);
-    border-radius:5px; padding:5px 6px; font-size:12px; font-family:var(--body); font-weight:700; width:150px; max-width:150px;
+    border-radius:5px; padding:5px 6px; font-size:12px; font-family:var(--body); font-weight:700; width:145px; max-width:145px;
     opacity:0; transition:opacity .12s ease;}
   .rail:hover .fiscalyear-select{opacity:1;}
   .pastyearnote{display:none; background:var(--pending); color:#2B1D00; font-weight:700; font-size:12.5px;
