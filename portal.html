@@ -126,6 +126,9 @@
   /* ── 打刻確認：日付・曜日列を横スクロールでも固定表示（leftはJSで実測して設定） ── */
   .dk-col0, .dk-col1{position:sticky; z-index:1; border-right:1.5px solid #999999;}
   .dk-corner{position:sticky; z-index:4; border-right:1.5px solid #16293A;}
+  /* 社員ごとの3列ブロックの境目を太めの縦線で区切る（実シートと同じ#666666。
+     ユーザー指摘：「打刻確認がなんか見づらい」への対応） */
+  .emp-end{border-right:2px solid #666666;}
   /* ── 月次集計・週別実働：氏名列を横スクロールでも固定表示 ── */
   .stickyname{position:sticky; left:0; z-index:1; background:var(--panel); border-right:1.5px solid #999999;}
   .stickyname-head{position:sticky; left:0; z-index:4; border-right:1.5px solid #16293A;}
@@ -136,6 +139,9 @@
   /* 有給管理：通常有給/積立有給の列グループを色分け */
   td.yukyu-normal{background:#EAF1FB;}
   td.yukyu-tsumitate{background:#FDF1E3;}
+  /* 36協定：年間累計指標/当月指標の列グループを色分け */
+  td.z36-nenkan{background:#EAF1FB;}
+  td.z36-tsukigetsu{background:#FDF1E3;}
   .emptystate{padding:40px 20px; text-align:center; color:var(--dim); font-size:13px;}
 
   /* ── ハンコ風スタンプ ── */
@@ -387,7 +393,7 @@
               <div class="periodbadges" id="home-nashi-badges"></div>
             </div>
             <table>
-              <thead id="home-nashi-thead"><tr><th>日付</th><th>氏名</th><th class="txtleft">内容</th><th>解消済み</th></tr></thead>
+              <thead id="home-nashi-thead"><tr><th>日付</th><th>氏名</th><th>内容</th><th>解消済み</th></tr></thead>
               <tbody id="home-nashi-tbody"></tbody>
             </table>
             <div class="emptystate" id="home-nashi-empty" hidden>該当者はいません。</div>
@@ -439,7 +445,7 @@
 
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th>種別</th><th class="txtleft">種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th>種別</th><th>種別・内容</th><th>対象日</th><th>事前/事後</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div class="emptystate" id="emptystate" hidden>条件に一致する申請がありません。</div>
@@ -467,7 +473,7 @@
       <p class="resultcount" id="shusei-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>ID</th><th>氏名</th><th class="txtleft">内容</th><th>対象日</th><th>正しい時刻</th><th>判定</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>氏名</th><th>内容</th><th>対象日</th><th>正しい時刻</th><th>判定</th><th>操作</th></tr></thead>
           <tbody id="shusei-tbody"></tbody>
         </table>
         <div class="emptystate" id="shusei-emptystate" hidden>条件に一致する修正依頼がありません。</div>
@@ -486,7 +492,7 @@
       <p class="resultcount" id="dakoku-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>日時</th><th>氏名</th><th>種別</th><th>実打刻時刻</th><th>集計用時刻</th><th class="txtleft">備考</th></tr></thead>
+          <thead><tr><th>日時</th><th>氏名</th><th>種別</th><th>実打刻時刻</th><th>集計用時刻</th><th>備考</th></tr></thead>
           <tbody id="dakoku-tbody"></tbody>
         </table>
         <div class="emptystate" id="dakoku-emptystate" hidden>条件に一致する打刻がありません。</div>
@@ -599,6 +605,7 @@
         <div class="f grow"><label>氏名</label><select id="fk-name"><option value="">全員表示</option></select></div>
         <div class="f"><label>&nbsp;</label><button class="refreshbtn" id="dakokukakunin-refresh">再読み込み</button></div>
       </div>
+      <div style="font-size:12px; color:var(--dim); margin:-2px 0 8px 2px;">💡 社員数が多く見づらい時は、「氏名」で1人だけに絞り込むと見やすくなります。</div>
       <p class="resultcount" id="dakokukakunin-resultcount"></p>
       <div class="sheet">
         <table>
@@ -898,7 +905,7 @@
         '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td>' + escapeHtml(r.yukyuKbn || '—') + '</td>' +
-        '<td class="txtleft">' + escapeHtml(r.detail) + '</td>' +
+        '<td>' + escapeHtml(r.detail) + '</td>' +
         '<td class="mono">' + escapeHtml(buildDateLabel(r)) + '</td>' +
         '<td>' + escapeHtml(r.jizenGo || '—') + '</td>' +
         '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
@@ -1144,7 +1151,7 @@
         '<td>' + escapeHtml(r.dakokuType) + '</td>' +
         '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.shuukeiTime || '—') + '</td>' +
-        '<td class="txtleft">' + escapeHtml(r.biko || '') + '</td>';
+        '<td>' + escapeHtml(r.biko || '') + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('dakoku-emptystate').hidden = filtered.length > 0;
@@ -1208,7 +1215,7 @@
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.appId) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td class="txtleft">' + escapeHtml(buildShuseiDetail(r)) + '</td>' +
+        '<td>' + escapeHtml(buildShuseiDetail(r)) + '</td>' +
         '<td class="mono">' + escapeHtml(r.taishouDate || '—') + '</td>' +
         '<td class="mono">' + escapeHtml(r.jissaiTime || '—') + '</td>' +
         '<td><span class="stamp ' + st[0] + '">' + st[1] + '</span></td>' +
@@ -1365,11 +1372,11 @@
       tr.innerHTML =
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
         '<td class="zone-end">' + kbnBadge_(r.koyouKbn) + '</td>' +
-        '<td class="mono">' + minToHhmm_(stats.sumMin) + '</td>' +
-        '<td class="mono">' + zan36Html + '</td>' +
-        '<td class="mono zone-end">' + excessHtml + '</td>' +
-        '<td class="mono">' + escapeHtml((curMonth && curMonth.value) || '—') + '</td>' +
-        '<td class="mono">' + escapeHtml(r.heikin || '—') + '</td>';
+        '<td class="mono z36-nenkan">' + minToHhmm_(stats.sumMin) + '</td>' +
+        '<td class="mono z36-nenkan">' + zan36Html + '</td>' +
+        '<td class="mono z36-nenkan zone-end">' + excessHtml + '</td>' +
+        '<td class="mono z36-tsukigetsu">' + escapeHtml((curMonth && curMonth.value) || '—') + '</td>' +
+        '<td class="mono z36-tsukigetsu">' + escapeHtml(r.heikin || '—') + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('zangyou-emptystate').hidden = filtered.length > 0;
@@ -1961,8 +1968,11 @@
   var DAKOKU_KAKUNIN_DATA = { employeeNames: [], days: [] };
   var kState = { label:'', name:'' };
 
-  function dkStyle_(bg, fc){
-    var s = 'background:' + (bg || '#ffffff') + ';';
+  // zebraBgを渡した時、警告色が付いていない素のセル（#ffffff）だけゼブラ地色に差し替える。
+  // 警告色（残業★・申請なし系等）が付いているセルはそのまま優先して見せる
+  function dkStyle_(bg, fc, zebraBg){
+    var base = (bg === '#ffffff' && zebraBg) ? zebraBg : bg;
+    var s = 'background:' + (base || '#ffffff') + ';';
     if (fc) s += 'color:' + fc + ';';
     return s;
   }
@@ -1985,9 +1995,9 @@
     var thead = document.getElementById('dakokukakunin-thead');
     thead.innerHTML =
       '<tr><th colspan="2" rowspan="2" class="dk-corner">日付</th>' +
-        empIdxs.map(function(i){ return '<th colspan="3">' + escapeHtml(allNames[i] || '—') + '</th>'; }).join('') +
+        empIdxs.map(function(i){ return '<th colspan="3" class="emp-end">' + escapeHtml(allNames[i] || '—') + '</th>'; }).join('') +
       '</tr><tr>' +
-        empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th class="txtleft">備考</th>'; }).join('') +
+        empIdxs.map(function(){ return '<th>出勤</th><th>退勤</th><th class="emp-end">備考</th>'; }).join('') +
       '</tr>';
     if (thead.rows.length === 2) {
       var h = thead.rows[0].offsetHeight;
@@ -2002,12 +2012,15 @@
       var cells =
         '<td class="mono dk-col0" style="' + dateStyle + '">' + escapeHtml(day.date) + '</td>' +
         '<td class="mono dk-col1" style="' + dateStyle + '">' + escapeHtml(day.dow) + '</td>';
-      empIdxs.forEach(function(i){
+      empIdxs.forEach(function(i, pos){
         var emp = day.employees[i] || {};
+        // 社員ブロックを1人おきに薄く塗って、どこで一人分が終わるか目で追いやすくする
+        // （警告色が付いているセルはdkStyle_側でそのまま優先される）
+        var zebraBg = (pos % 2 === 1) ? '#F0EEE2' : null;
         cells +=
-          '<td class="mono" style="' + dkStyle_(emp.shukkinBg, emp.shukkinFc) + '">' + escapeHtml(emp.shukkin || '—') + '</td>' +
-          '<td class="mono" style="' + dkStyle_(emp.taikinBg, emp.taikinFc) + '">' + escapeHtml(emp.taikin || '—') + '</td>' +
-          '<td class="txtleft" style="' + dkStyle_(emp.bikoBg, emp.bikoFc) + '">' + escapeHtml(emp.biko || '') + '</td>';
+          '<td class="mono" style="' + dkStyle_(emp.shukkinBg, emp.shukkinFc, zebraBg) + '">' + escapeHtml(emp.shukkin || '—') + '</td>' +
+          '<td class="mono" style="' + dkStyle_(emp.taikinBg, emp.taikinFc, zebraBg) + '">' + escapeHtml(emp.taikin || '—') + '</td>' +
+          '<td class="emp-end" style="' + dkStyle_(emp.bikoBg, emp.bikoFc, zebraBg) + '">' + escapeHtml(emp.biko || '') + '</td>';
       });
       tr.innerHTML = cells;
       tbody.appendChild(tr);
@@ -2111,7 +2124,7 @@
       tr.innerHTML =
         '<td class="mono">' + escapeHtml(r.dateStr) + '</td>' +
         '<td class="name">' + escapeHtml(r.name) + '</td>' +
-        '<td class="txtleft">' + escapeHtml(r.content) + '</td>' +
+        '<td>' + escapeHtml(r.content) + '</td>' +
         '<td>' + badge + '</td>';
       tr.addEventListener('click', function(){ jumpToTab('dakoku', r.name, { date: r.dateStr.replace(/\//g, '-') }); });
       tbody.appendChild(tr);
