@@ -272,11 +272,11 @@
   .leg .lb{font-size:12px; font-weight:700; color:var(--ink);}
   .leg .ct{font-size:12px; font-weight:700;}
 
-  .cat-approve .bdseg, .leg.cat-approve .dot, .feedtag.cat-approve{background:var(--pending);}
-  .cat-missing .bdseg, .leg.cat-missing .dot, .feedtag.cat-missing{background:var(--denied);}
-  .cat-mistake .bdseg, .leg.cat-mistake .dot, .feedtag.cat-mistake{background:var(--mistake);}
-  .cat-yukyu   .bdseg, .leg.cat-yukyu   .dot, .feedtag.cat-yukyu{background:var(--provisional);}
-  .cat-zangyo  .bdseg, .leg.cat-zangyo  .dot, .feedtag.cat-zangyo{background:var(--rail-accent);}
+  .bdseg.cat-approve, .leg.cat-approve .dot, .feedtag.cat-approve{background:var(--pending);}
+  .bdseg.cat-missing, .leg.cat-missing .dot, .feedtag.cat-missing{background:var(--denied);}
+  .bdseg.cat-mistake, .leg.cat-mistake .dot, .feedtag.cat-mistake{background:var(--mistake);}
+  .bdseg.cat-yukyu  , .leg.cat-yukyu   .dot, .feedtag.cat-yukyu{background:var(--provisional);}
+  .bdseg.cat-zangyo , .leg.cat-zangyo  .dot, .feedtag.cat-zangyo{background:var(--rail-accent);}
   .leg.cat-approve .ct{color:var(--pending);}
   .leg.cat-missing .ct{color:var(--denied);}
   .leg.cat-mistake .ct{color:var(--mistake);}
@@ -659,7 +659,7 @@
       <p class="resultcount" id="shain-resultcount"></p>
       <div class="sheet">
         <table>
-          <thead><tr><th>氏名</th><th>雇用区分</th><th>定時</th><th>入社日</th><th>勤務曜日</th><th>テスト参加</th><th class="txtleft">備考</th></tr></thead>
+          <thead><tr><th>氏名</th><th>雇用区分</th><th>定時</th><th>入社日</th><th>勤務曜日</th><th>テスト参加</th><th>備考</th></tr></thead>
           <tbody id="shain-tbody"></tbody>
         </table>
         <div class="emptystate" id="shain-emptystate" hidden>条件に一致する社員がいません。</div>
@@ -1559,7 +1559,7 @@
         '<td class="mono">' + escapeHtml(r.nyushaDate || '—') + '</td>' +
         '<td>' + escapeHtml(r.workDays || '毎平日') + '</td>' +
         '<td>' + (r.isTestSanka ? '<span class="statuspill approved">対象</span>' : '—') + '</td>' +
-        '<td class="txtleft">' + escapeHtml(r.biko || '') + '</td>';
+        '<td>' + escapeHtml(r.biko || '') + '</td>';
       tbody.appendChild(tr);
     });
     document.getElementById('shain-emptystate').hidden = filtered.length > 0;
