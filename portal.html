@@ -307,11 +307,18 @@
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
   .toast.err{background:var(--denied);}
 
-  /* ── 年度選択（レール上部、全タブ共通。2026-10-18新設） ── */
+  /* ── 年度選択（レール上部、全タブ共通。2026-10-18新設） ──
+     レール内側（.rail-inner）は常に196px幅で、外側の.railが64px/196pxの「窓」として
+     クリップする作り（ナビボタンの文字もこれで折りたたみ時に隠れている）。ボタンの文字は
+     単なる文字なのでクリップされても何も見えないが、selectは自分の背景・枠線を持つため、
+     窓の境目にその一部だけがはみ出して見えてしまっていた（ユーザー指摘：「はみ出て見えない」）。
+     折りたたみ時はopacity:0で完全に透明にし、レールにカーソルが乗った時だけ見せる */
   .rail .fiscalyear{display:flex; align-items:center; gap:13px; padding:0 9px; margin-bottom:14px; white-space:nowrap;}
   .rail .fiscalyear .ic{font-size:16px; width:20px; text-align:center; flex-shrink:0;}
   .fiscalyear-select{background:var(--rail-field); color:var(--rail-ink); border:1px solid rgba(255,255,255,.16);
-    border-radius:5px; padding:5px 6px; font-size:12px; font-family:var(--body); font-weight:700; width:150px; max-width:150px;}
+    border-radius:5px; padding:5px 6px; font-size:12px; font-family:var(--body); font-weight:700; width:150px; max-width:150px;
+    opacity:0; transition:opacity .12s ease;}
+  .rail:hover .fiscalyear-select{opacity:1;}
   .pastyearnote{display:none; background:var(--pending); color:#2B1D00; font-weight:700; font-size:12.5px;
     padding:9px 16px; border-radius:7px; margin-bottom:14px;}
   body.pastyear .pastyearnote{display:block;}
@@ -327,6 +334,7 @@
     .rail nav{flex-direction:row; overflow-x:auto;}
     .rail button{width:auto;}
     .rail .fiscalyear{margin-bottom:8px;}
+    .fiscalyear-select{opacity:1;} /* モバイルはレールが常に全幅で折りたたみが無いため、常に表示する */
     .sheet{overflow-x:auto;}
     table{min-width:700px;}
   }
