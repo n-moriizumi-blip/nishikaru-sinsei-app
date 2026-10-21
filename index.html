@@ -498,11 +498,11 @@
   <input type="date" id="shuuseiDate">
 
   <label>修正内容</label>
+  <!-- 2026-10-21変更：以前は「出勤時刻の修正」のように種別込みの6択だったが、「打刻の追加」
+       「打刻の削除」だけ先に種別を聞く2段階になっており不統一だった。修正も同じ2段階に揃え、
+       この3択＋下の「対象の打刻種別」の組み合わせで最終的な修正内容を決める -->
   <div class="radio-group" id="contentGroup">
-    <label class="radio-pill"><input type="radio" name="content" value="出勤時刻の修正"> 出勤時刻の修正</label>
-    <label class="radio-pill"><input type="radio" name="content" value="退勤時刻の修正"> 退勤時刻の修正</label>
-    <label class="radio-pill"><input type="radio" name="content" value="外出時刻の修正"> 外出時刻の修正</label>
-    <label class="radio-pill"><input type="radio" name="content" value="帰社時刻の修正"> 帰社時刻の修正</label>
+    <label class="radio-pill"><input type="radio" name="content" value="修正"> 打刻の修正</label>
     <label class="radio-pill"><input type="radio" name="content" value="打刻の追加"> 打刻の追加</label>
     <label class="radio-pill"><input type="radio" name="content" value="打刻の削除"> 打刻の削除</label>
   </div>
@@ -1002,6 +1002,9 @@
   // ============================================================
   // 打刻修正依頼
   // ============================================================
+  // 2026-10-21：旧フォーム形式（種別込みの「出勤時刻の修正」等）→現在のUI（「修正」＋
+  // 対象の打刻種別）への変換に使う。打刻ログシートに既にある過去の修正依頼を編集する際、
+  // startEditingShuuseiがこれで2段階のUIへ分解する
   const contentToDakokuType = {
     '出勤時刻の修正': '出勤',
     '退勤時刻の修正': '退勤',
@@ -1043,8 +1046,12 @@
   function startEditingShuusei(req) {
     shuuseiEditingAppId = req.appId;
     shuuseiDateInput.value = req.taishouDate.replace(/\//g, '-');
-    setRadioValue('content', req.content);
-    setRadioValue('addType', req.addType || '');
+    // req.contentはシートに保存されている最終形（「出勤時刻の修正」等、または「打刻の追加」
+    // 「打刻の削除」）。現在のUIは「修正／追加／削除」＋対象の打刻種別の2段階なので、
+    // 「○○時刻の修正」だった場合はここで action='修正' に分解する
+    const editDakokuType = contentToDakokuType[req.content];
+    setRadioValue('content', editDakokuType ? '修正' : req.content);
+    setRadioValue('addType', editDakokuType || req.addType || '');
     jissaiTimeInput.value = req.jissaiTime || '';
     document.getElementById('shuuseiRiyu').value = req.riyu;
     updateShuuseiFieldVisibility();
@@ -1078,20 +1085,23 @@
   const actualPunchHintEl= document.getElementById('actualPunchHint');
 
   function updateShuuseiFieldVisibility() {
-    const content = getRadioValue('content');
-    addTypeArea.classList.toggle('hidden', content !== '打刻の追加' && content !== '打刻の削除');
-    shuuseiTimeArea.classList.toggle('hidden', content === '打刻の削除');
+    const action = getRadioValue('content');
+    // 2026-10-21変更：「修正」も対象の打刻種別を別途聞く2段階に統一したため、
+    // 3択のどれかが選ばれていれば常に種別選択を表示する
+    addTypeArea.classList.toggle('hidden', !action);
+    shuuseiTimeArea.classList.toggle('hidden', action === '打刻の削除');
   }
 
-  // 修正対象日・修正内容（○○時刻の修正）が両方揃ったら、現在の実打刻時刻を自動取得して
-  // 入力欄に反映する（自動補正機能。ゼロから時刻を入力させない）
+  // 2026-10-21変更：対象日・修正内容(action)・対象の打刻種別(addType)が揃ったら、現在の
+  // 実打刻の有無を確認する。「修正」なのに打刻が無い／「追加」なのに既に打刻がある、という
+  // 逆のケースにもここで気づけるよう、双方向で注意表示する（修正⇔追加の混同が多かったため）
   function fetchActualPunch() {
-    const content    = getRadioValue('content');
-    const dakokuType = contentToDakokuType[content];
+    const action     = getRadioValue('content');
+    const dakokuType = getRadioValue('addType');
     const dateStr    = shuuseiDateInput.value; // yyyy-MM-dd
     actualPunchHintEl.textContent = '';
     actualPunchHintEl.classList.remove('warn');
-    if (!dakokuType || !dateStr || !idToken) return;
+    if (!action || !dakokuType || !dateStr || !idToken) return;
     const dateStrSlash = dateStr.replace(/-/g, '/');
     actualPunchHintEl.textContent = '現在の打刻を確認中...';
     fetch(GAS_URL + '?mode=getActualPunch&token=' + encodeURIComponent(idToken) +
@@ -1100,19 +1110,39 @@
       .then((data) => {
         if (!data.success) { actualPunchHintEl.textContent = '確認できませんでした：' + data.error; return; }
         if (data.time) {
-          actualPunchHintEl.classList.remove('warn');
-          actualPunchHintEl.textContent = '現在の実打刻：' + data.time + '（下の欄に自動入力しました。必要に応じて修正してください）';
-          jissaiTimeInput.value = data.time;
+          if (action === '修正') {
+            actualPunchHintEl.classList.remove('warn');
+            actualPunchHintEl.textContent = '現在の実打刻：' + data.time + '（下の欄に自動入力しました。必要に応じて修正してください）';
+            jissaiTimeInput.value = data.time;
+          } else if (action === '打刻の追加') {
+            // 既に打刻があるのに「追加」を選んでいる＝本当は「修正」のケース
+            actualPunchHintEl.classList.add('warn');
+            actualPunchHintEl.innerHTML = 'その日・その種別の打刻は既にあります（現在の実打刻：' + data.time + '）。既にある打刻の時刻を直したい場合は「打刻の修正」を選んでください。' +
+              '<br><button type="button" class="switch-to-add-btn" id="switchToFixBtn">「打刻の修正」に切り替える</button>';
+            const switchFixBtn = document.getElementById('switchToFixBtn');
+            if (switchFixBtn) switchFixBtn.addEventListener('click', () => switchContentToFix(data.time));
+          } else {
+            // 打刻の削除：対象が実在することを示すだけ（警告不要）
+            actualPunchHintEl.classList.remove('warn');
+            actualPunchHintEl.textContent = '現在の実打刻：' + data.time + '（この打刻を削除します）';
+          }
         } else {
-          // 2026-10-21新設：対象の打刻自体が無い＝「修正」ではなく「打刻の追加」で
-          // 申請すべきケースなので、ここで気づけるよう強調表示し、ワンタップで
-          // 切り替えられるボタンを添える（修正で申請→総務が否認→追加で出し直し、
-          // という手戻りが多発していたため）
-          actualPunchHintEl.classList.add('warn');
-          actualPunchHintEl.innerHTML = 'その日・その種別の打刻が見つかりません。打刻自体が無い場合は「修正」ではなく「打刻の追加」で申請してください。' +
-            '<br><button type="button" class="switch-to-add-btn" id="switchToAddBtn">「打刻の追加」に切り替える</button>';
-          const switchBtn = document.getElementById('switchToAddBtn');
-          if (switchBtn) switchBtn.addEventListener('click', () => switchContentToAdd(dakokuType));
+          if (action === '修正') {
+            // 2026-10-21新設：対象の打刻自体が無い＝「修正」ではなく「打刻の追加」で
+            // 申請すべきケースなので、ここで気づけるよう強調表示し、ワンタップで
+            // 切り替えられるボタンを添える（修正で申請→総務が否認→追加で出し直し、
+            // という手戻りが多発していたため）
+            actualPunchHintEl.classList.add('warn');
+            actualPunchHintEl.innerHTML = 'その日・その種別の打刻が見つかりません。打刻自体が無い場合は「修正」ではなく「打刻の追加」で申請してください。' +
+              '<br><button type="button" class="switch-to-add-btn" id="switchToAddBtn">「打刻の追加」に切り替える</button>';
+            const switchBtn = document.getElementById('switchToAddBtn');
+            if (switchBtn) switchBtn.addEventListener('click', () => switchContentToAdd(dakokuType));
+          } else if (action === '打刻の削除') {
+            actualPunchHintEl.classList.add('warn');
+            actualPunchHintEl.textContent = 'その日・その種別の打刻が見つかりません。削除する対象が無い可能性があります。';
+          } else {
+            actualPunchHintEl.textContent = 'その日・その種別の打刻はまだありません（新規に追加されます）。';
+          }
         }
       })
       .catch(() => { actualPunchHintEl.textContent = '確認中にエラーが発生しました。'; });
@@ -1129,29 +1159,48 @@
     actualPunchHintEl.textContent = '';
   }
 
+  // 「打刻の修正」に切り替え、既存の実打刻時刻を自動入力する（種別は変えない）
+  function switchContentToFix(actualTime) {
+    const fixContentRadio = document.querySelector('input[name="content"][value="修正"]');
+    if (fixContentRadio) fixContentRadio.checked = true;
+    updateShuuseiFieldVisibility();
+    jissaiTimeInput.value = actualTime;
+    actualPunchHintEl.classList.remove('warn');
+    actualPunchHintEl.textContent = '現在の実打刻：' + actualTime + '（下の欄に自動入力しました。必要に応じて修正してください）';
+  }
+
   document.querySelectorAll('input[name="content"]').forEach((r) => {
     r.addEventListener('change', () => { updateShuuseiFieldVisibility(); fetchActualPunch(); });
+  });
+  document.querySelectorAll('input[name="addType"]').forEach((r) => {
+    r.addEventListener('change', fetchActualPunch);
   });
   shuuseiDateInput.addEventListener('change', fetchActualPunch);
 
   document.getElementById('shuuseiSubmitBtn').addEventListener('click', () => {
     const taishouDate = shuuseiDateInput.value ? shuuseiDateInput.value.replace(/-/g, '/') : '';
-    const content     = getRadioValue('content');
+    const action      = getRadioValue('content'); // 修正／打刻の追加／打刻の削除
     const addType     = getRadioValue('addType');
     const jissaiTime  = jissaiTimeInput.value;
     const riyu        = document.getElementById('shuuseiRiyu').value.trim();
     const messageEl   = document.getElementById('shuuseiMessage');
     messageEl.className = 'message'; messageEl.textContent = '';
 
-    if (!taishouDate || !content || !riyu) {
+    if (!taishouDate || !action || !riyu) {
       messageEl.className = 'message err'; messageEl.textContent = '未入力の項目があります。'; return;
     }
-    if ((content === '打刻の追加' || content === '打刻の削除') && !addType) {
+    // 2026-10-21変更：「修正」も対象の打刻種別を別途聞く形になったため、3択すべてで必須にした
+    if (!addType) {
       messageEl.className = 'message err'; messageEl.textContent = '対象の打刻種別を選んでください。'; return;
     }
-    if (content !== '打刻の削除' && !jissaiTime) {
+    if (action !== '打刻の削除' && !jissaiTime) {
       messageEl.className = 'message err'; messageEl.textContent = '正しい時刻を入力してください。'; return;
     }
+
+    // シートに保存する最終形の修正内容へ変換（「修正」＋addType→「出勤時刻の修正」等）。
+    // 「打刻の追加」「打刻の削除」はそのまま。管理画面・GAS側（applyShuuseiToDakokuLog等）は
+    // この最終形の文字列を前提にしているため、ここで必ず変換してから送信する
+    const content = (action === '修正') ? (addType + '時刻の修正') : action;
 
     const btn = document.getElementById('shuuseiSubmitBtn');
     const isEditing = !!shuuseiEditingAppId;
