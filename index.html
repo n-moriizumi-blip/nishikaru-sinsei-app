@@ -352,6 +352,27 @@
     color: #7F0000;
     border-left-color: #B00020;
   }
+  /* 2026-10-21新設：打刻修正依頼で、対象の打刻自体が見つからない（「追加」で
+     申請すべきケース）場合の注意表示 */
+  .hint.warn {
+    background: #FCE4D6;
+    color: #7F0000;
+    border-left: 3px solid #B00020;
+    border-radius: var(--radius-s);
+    padding: 9px 12px;
+    font-weight: 700;
+  }
+  .switch-to-add-btn {
+    margin-top: 6px;
+    background: #B00020;
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
   .tool-link {
     display: inline-block;
     font-size: 12.5px;
@@ -1069,6 +1090,7 @@
     const dakokuType = contentToDakokuType[content];
     const dateStr    = shuuseiDateInput.value; // yyyy-MM-dd
     actualPunchHintEl.textContent = '';
+    actualPunchHintEl.classList.remove('warn');
     if (!dakokuType || !dateStr || !idToken) return;
     const dateStrSlash = dateStr.replace(/-/g, '/');
     actualPunchHintEl.textContent = '現在の打刻を確認中...';
@@ -1078,13 +1100,33 @@
       .then((data) => {
         if (!data.success) { actualPunchHintEl.textContent = '確認できませんでした：' + data.error; return; }
         if (data.time) {
+          actualPunchHintEl.classList.remove('warn');
           actualPunchHintEl.textContent = '現在の実打刻：' + data.time + '（下の欄に自動入力しました。必要に応じて修正してください）';
           jissaiTimeInput.value = data.time;
         } else {
-          actualPunchHintEl.textContent = 'その日・その種別の打刻は見つかりませんでした。';
+          // 2026-10-21新設：対象の打刻自体が無い＝「修正」ではなく「打刻の追加」で
+          // 申請すべきケースなので、ここで気づけるよう強調表示し、ワンタップで
+          // 切り替えられるボタンを添える（修正で申請→総務が否認→追加で出し直し、
+          // という手戻りが多発していたため）
+          actualPunchHintEl.classList.add('warn');
+          actualPunchHintEl.innerHTML = 'その日・その種別の打刻が見つかりません。打刻自体が無い場合は「修正」ではなく「打刻の追加」で申請してください。' +
+            '<br><button type="button" class="switch-to-add-btn" id="switchToAddBtn">「打刻の追加」に切り替える</button>';
+          const switchBtn = document.getElementById('switchToAddBtn');
+          if (switchBtn) switchBtn.addEventListener('click', () => switchContentToAdd(dakokuType));
         }
       })
       .catch(() => { actualPunchHintEl.textContent = '確認中にエラーが発生しました。'; });
+  }
+
+  // 「打刻の追加」に切り替え、元々選んでいた種別（出勤／退勤／外出／帰社）をそのまま引き継ぐ
+  function switchContentToAdd(dakokuType) {
+    const addContentRadio = document.querySelector('input[name="content"][value="打刻の追加"]');
+    if (addContentRadio) addContentRadio.checked = true;
+    updateShuuseiFieldVisibility();
+    const addTypeRadio = document.querySelector('input[name="addType"][value="' + dakokuType + '"]');
+    if (addTypeRadio) addTypeRadio.checked = true;
+    actualPunchHintEl.classList.remove('warn');
+    actualPunchHintEl.textContent = '';
   }
 
   document.querySelectorAll('input[name="content"]').forEach((r) => {
