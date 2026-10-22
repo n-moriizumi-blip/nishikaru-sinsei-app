@@ -332,6 +332,22 @@
     padding: 1px 7px;
     margin-left: 4px;
   }
+  /* 2026-10-22新設：打刻履歴の遅刻・早退・休日出勤・残業・有給等ステータス表示。
+     打刻確認シート（集計.gs、COLOR定数）と同じ配色に揃えた */
+  .tag-status {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 8px;
+    margin: 2px 4px 0 0;
+  }
+  .tag-status.none      { color: #7F0000; background: #FCE4D6; }  /* 無申請（要対応） */
+  .tag-status.pending    { color: #00695C; background: #CDEAE6; }  /* 承認待ち */
+  .tag-status.approved  { color: #424242; background: #E8E8E8; }  /* 承認済・問題なし */
+  .tag-status.zangyou    { color: #B45F06; background: #FFE0B2; }  /* 残業★・承認済み休日出勤 */
+  .tag-status.yukyu      { color: #274E13; background: #D9EAD3; }  /* 有給・積立有給 */
+  .tag-status.tokubetsu  { color: #4A235A; background: #EAD1DC; }  /* 特別休暇・傷病等 */
   .duration-preview {
     background: var(--bg);
     color: var(--primary);
@@ -2268,6 +2284,24 @@
       .catch(() => { bodyEl.textContent = '取得中にエラーが発生しました。'; });
   }
 
+  // 2026-10-22新設：遅刻・早退・休日出勤の3段階ステータス（'approved'/'pending'/'none'）を
+  // バッジのHTMLに変換する（打刻確認シート、集計.gsと同じ配色・考え方）。休日出勤が
+  // 承認済みの場合だけ残業★と同じ色（zangyou）にする（ユーザー指摘：別の色にする理由が無い）
+  function statusTag_(label, state, isKyujitsu) {
+    if (!state) return '';
+    const cls = state === 'approved' ? (isKyujitsu ? 'zangyou' : 'approved') : state; // 'pending'|'none'はそのまま
+    const text = state === 'approved' ? label : (state === 'pending' ? label + '申請承認待ち' : '申請なし' + label);
+    return '<span class="tag-status ' + cls + '">' + text + '</span>';
+  }
+
+  // 有給・特別休暇等のラベル文字列（categorizeShinseiForDakokuKakunin、集計.gsの出力）から
+  // 表示用CSSクラスを決める（色の意味はそのまま踏襲）
+  function leaveTagClass_(label) {
+    if (label === '有給' || label === '積立有給') return 'yukyu';
+    if (label === '特別休暇' || label.includes('傷病')) return 'tokubetsu';
+    return 'none'; // 欠勤・遅刻▲・早退▽等
+  }
+
   function renderDakokuHistory(list) {
     const bodyEl = document.getElementById('dakokuHistoryBody');
     if (list.length === 0) { bodyEl.innerHTML = '<p style="color:var(--ink-dim);">この期間の打刻はありません。</p>'; return; }
@@ -2280,14 +2314,25 @@
       const mmdd = (dt.getMonth() + 1) + '/' + dt.getDate();
       const dowClass = d.isHoliday ? 'dow holiday' : 'dow';
 
-      let segs = '<span class="seg"><span class="lbl">出勤</span><span class="val">' + (d.shukkin || '未打刻') + '</span></span>';
-      d.gaishutsu.forEach((g) => {
-        segs += '<span class="seg"><span class="lbl">外出</span><span class="val">' + g.start + '</span></span>';
-        segs += '<span class="seg"><span class="lbl">帰社</span><span class="val">' + g.end + '</span></span>';
+      let segs = '';
+      if (d.shukkin || d.taikin || d.gaishutsu.length) {
+        segs += '<span class="seg"><span class="lbl">出勤</span><span class="val">' + (d.shukkin || '未打刻') + '</span></span>';
+        d.gaishutsu.forEach((g) => {
+          segs += '<span class="seg"><span class="lbl">外出</span><span class="val">' + g.start + '</span></span>';
+          segs += '<span class="seg"><span class="lbl">帰社</span><span class="val">' + g.end + '</span></span>';
+        });
+        const taikinClass = d.taikinMissing ? 'val missing' : 'val';
+        segs += '<span class="seg"><span class="lbl">退勤</span><span class="' + taikinClass + '">' + (d.taikin || '未打刻') + '</span></span>';
+      }
+      // 休日出勤タグは従来の無条件表示（tag-holiday）をやめ、ステータス付きの1種類に統一
+      if (d.kyujitsuState) segs += statusTag_('休日出勤', d.kyujitsuState, true);
+      if (d.chikokuState) segs += statusTag_('遅刻', d.chikokuState, false);
+      if (d.soutaiState)  segs += statusTag_('早退', d.soutaiState, false);
+      if (d.zangyou) segs += '<span class="tag-status zangyou">残業★</span>';
+      (d.leave || []).forEach((l) => {
+        const text = l.status === 'pending' ? l.label + '（承認待ち）' : l.label;
+        segs += '<span class="tag-status ' + leaveTagClass_(l.label) + '">' + text + '</span>';
       });
-      const taikinClass = d.taikinMissing ? 'val missing' : 'val';
-      segs += '<span class="seg"><span class="lbl">退勤</span><span class="' + taikinClass + '">' + (d.taikin || '未打刻') + '</span></span>';
-      if (d.isHoliday) segs += '<span class="tag-holiday">休日出勤</span>';
       if (d.taikinMissing) {
         segs += '<div class="dakoku-note">⚠ 退勤打刻がありません<span class="fix-link" onclick="showSection(\'shuusei\')">打刻修正依頼へ</span></div>';
       }
