@@ -598,18 +598,37 @@
   <div id="hiruKyukeiArea" class="hidden">
     <label>昼休憩（45分間）を取りましたか？</label>
     <p class="hint" style="margin-top:-2px;">※休日出勤で実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
-    <div class="radio-group row" id="hiruKyukeiGroup">
-      <label class="radio-pill"><input type="radio" name="hiruKyukei" value="はい"> はい</label>
-      <label class="radio-pill"><input type="radio" name="hiruKyukei" value="いいえ"> いいえ</label>
+    <div class="radio-group row" id="hiruKyukeiYesNoGroup">
+      <label class="radio-pill"><input type="radio" name="hiruKyukeiYesNo" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="hiruKyukeiYesNo" value="いいえ"> いいえ</label>
+    </div>
+    <div class="radio-group row hidden" id="hiruKyukeiLocationArea" style="margin-top:6px;">
+      <label class="radio-pill"><input type="radio" name="hiruKyukeiLocation" value="社内"> 社内で休憩</label>
+      <label class="radio-pill"><input type="radio" name="hiruKyukeiLocation" value="外出"> 外出して休憩</label>
+    </div>
+    <!-- 実際にサーバーへ送る値（いいえ／はい（社内）／はい（外出））。上の2段階UIからJSで設定する -->
+    <div class="hidden">
+      <input type="radio" name="hiruKyukei" value="いいえ">
+      <input type="radio" name="hiruKyukei" value="はい（社内）">
+      <input type="radio" name="hiruKyukei" value="はい（外出）">
     </div>
   </div>
 
   <div id="gogoKyukeiArea" class="hidden">
     <label>午後休憩（15分間）を取りましたか？</label>
     <p class="hint" style="margin-top:-2px;">※休日出勤で実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
-    <div class="radio-group row" id="gogoKyukeiGroup">
-      <label class="radio-pill"><input type="radio" name="gogoKyukei" value="はい"> はい</label>
-      <label class="radio-pill"><input type="radio" name="gogoKyukei" value="いいえ"> いいえ</label>
+    <div class="radio-group row" id="gogoKyukeiYesNoGroup">
+      <label class="radio-pill"><input type="radio" name="gogoKyukeiYesNo" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="gogoKyukeiYesNo" value="いいえ"> いいえ</label>
+    </div>
+    <div class="radio-group row hidden" id="gogoKyukeiLocationArea" style="margin-top:6px;">
+      <label class="radio-pill"><input type="radio" name="gogoKyukeiLocation" value="社内"> 社内で休憩</label>
+      <label class="radio-pill"><input type="radio" name="gogoKyukeiLocation" value="外出"> 外出して休憩</label>
+    </div>
+    <div class="hidden">
+      <input type="radio" name="gogoKyukei" value="いいえ">
+      <input type="radio" name="gogoKyukei" value="はい（社内）">
+      <input type="radio" name="gogoKyukei" value="はい（外出）">
     </div>
   </div>
 
@@ -670,18 +689,36 @@
   <div id="chokkouHiruKyukeiArea" class="hidden">
     <label>昼休憩（45分間）を取りますか？</label>
     <p class="hint" style="margin-top:-2px;">※実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
-    <div class="radio-group row" id="chokkouHiruKyukeiGroup">
-      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukei" value="はい"> はい</label>
-      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukei" value="いいえ"> いいえ</label>
+    <div class="radio-group row" id="chokkouHiruKyukeiYesNoGroup">
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukeiYesNo" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukeiYesNo" value="いいえ"> いいえ</label>
+    </div>
+    <div class="radio-group row hidden" id="chokkouHiruKyukeiLocationArea" style="margin-top:6px;">
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukeiLocation" value="社内"> 社内で休憩</label>
+      <label class="radio-pill"><input type="radio" name="chokkouHiruKyukeiLocation" value="外出"> 外出して休憩</label>
+    </div>
+    <div class="hidden">
+      <input type="radio" name="chokkouHiruKyukei" value="いいえ">
+      <input type="radio" name="chokkouHiruKyukei" value="はい（社内）">
+      <input type="radio" name="chokkouHiruKyukei" value="はい（外出）">
     </div>
   </div>
 
   <div id="chokkouGogoKyukeiArea" class="hidden">
     <label>午後休憩（15分間）を取りますか？</label>
     <p class="hint" style="margin-top:-2px;">※実働6時間以上の場合は休憩45分以上、実働8時間以上の場合は休憩60分（45分＋15分）以上の取得が必要です。</p>
-    <div class="radio-group row" id="chokkouGogoKyukeiGroup">
-      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukei" value="はい"> はい</label>
-      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukei" value="いいえ"> いいえ</label>
+    <div class="radio-group row" id="chokkouGogoKyukeiYesNoGroup">
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukeiYesNo" value="はい"> はい</label>
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukeiYesNo" value="いいえ"> いいえ</label>
+    </div>
+    <div class="radio-group row hidden" id="chokkouGogoKyukeiLocationArea" style="margin-top:6px;">
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukeiLocation" value="社内"> 社内で休憩</label>
+      <label class="radio-pill"><input type="radio" name="chokkouGogoKyukeiLocation" value="外出"> 外出して休憩</label>
+    </div>
+    <div class="hidden">
+      <input type="radio" name="chokkouGogoKyukei" value="いいえ">
+      <input type="radio" name="chokkouGogoKyukei" value="はい（社内）">
+      <input type="radio" name="chokkouGogoKyukei" value="はい（外出）">
     </div>
   </div>
 
@@ -976,6 +1013,48 @@
   }
   function setRadioValue(name, value) {
     document.querySelectorAll('input[name="' + name + '"]').forEach((el) => { el.checked = (el.value === value); });
+  }
+
+  // 2026-10-25新設：昼休憩・午後休憩の回答（いいえ／はい（社内）／はい（外出）の3値）を、
+  // 「はい/いいえ→（はいの場合）社内/外出」の2段階UIで入力させるための共通ヘルパー。
+  // 実際にサーバーへ送る値はname=prefixの非表示ラジオ（既存のgetRadioValue/setRadioValueが
+  // そのまま使える）が保持し、見た目の2段階UI（prefix+'YesNo'・prefix+'Location'）はJSだけで
+  // この値を組み立てる・復元する役割に限定している
+  function setupKyukeiTwoStage_(prefix, onChange) {
+    function recompute() {
+      const yn = getRadioValue(prefix + 'YesNo');
+      const loc = getRadioValue(prefix + 'Location');
+      document.getElementById(prefix + 'LocationArea').classList.toggle('hidden', yn !== 'はい');
+      let finalVal = '';
+      if (yn === 'いいえ') finalVal = 'いいえ';
+      else if (yn === 'はい' && loc) finalVal = 'はい（' + loc + '）';
+      setRadioValue(prefix, finalVal);
+      if (onChange) onChange();
+    }
+    document.querySelectorAll('input[name="' + prefix + 'YesNo"], input[name="' + prefix + 'Location"]').forEach((r) => {
+      r.addEventListener('change', recompute);
+    });
+  }
+  // 実際の値（いいえ／はい（社内）／はい（外出））から、見た目の2段階UIを復元する
+  // （編集画面を開いたときに使う。setRadioValue(prefix, value)はこの関数の呼び出し側で別途行う）
+  function syncKyukeiTwoStageFromValue_(prefix, value) {
+    const v = String(value || '');
+    let yn = '', loc = '';
+    if (v === 'いいえ') { yn = 'いいえ'; }
+    else if (v.indexOf('はい') === 0) {
+      yn = 'はい';
+      loc = v.indexOf('社内') >= 0 ? '社内' : (v.indexOf('外出') >= 0 ? '外出' : '');
+    }
+    setRadioValue(prefix + 'YesNo', yn);
+    setRadioValue(prefix + 'Location', loc);
+    document.getElementById(prefix + 'LocationArea').classList.toggle('hidden', yn !== 'はい');
+  }
+  // 2段階UI・実際の値をまとめて未回答状態にリセットする
+  function resetKyukeiTwoStage_(prefix) {
+    setRadioValue(prefix, '');
+    setRadioValue(prefix + 'YesNo', '');
+    setRadioValue(prefix + 'Location', '');
+    document.getElementById(prefix + 'LocationArea').classList.add('hidden');
   }
 
   // JWT（IDトークン）はBase64URL形式（標準Base64の「+」「/」がそれぞれ「-」「_」に置き換わり、
@@ -1340,7 +1419,7 @@
         const isHolidayWork = data.success && data.isWorkday === false;
         hiruArea.classList.toggle('hidden', !isHolidayWork);
         gogoArea.classList.toggle('hidden', !isHolidayWork);
-        if (!isHolidayWork) { setRadioValue('hiruKyukei', ''); setRadioValue('gogoKyukei', ''); }
+        if (!isHolidayWork) { resetKyukeiTwoStage_('hiruKyukei'); resetKyukeiTwoStage_('gogoKyukei'); }
         updateZangyouDurationPreview();
       })
       .catch(() => {});
@@ -1356,8 +1435,10 @@
     if (!start || !end) { el.classList.add('hidden'); return; }
     let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start); // 休憩を引く前、開始〜終了の実働時間
     if (rawSpan <= 0) rawSpan += 24 * 60;
-    const hiruYes = getRadioValue('hiruKyukei') === 'はい';
-    const gogoYes = getRadioValue('gogoKyukei') === 'はい';
+    // 2026-10-25変更：回答の値が「いいえ」「はい（社内）」「はい（外出）」になったため、
+    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（ここは合計分数だけで足りる）
+    const hiruYes = getRadioValue('hiruKyukei').indexOf('はい') === 0;
+    const gogoYes = getRadioValue('gogoKyukei').indexOf('はい') === 0;
     let total = rawSpan;
     if (hiruYes) total -= 45;
     if (gogoYes) total -= 15;
@@ -1384,9 +1465,8 @@
   ['zangyouStart', 'zangyouEnd'].forEach((id) => {
     document.getElementById(id).addEventListener('input', updateZangyouDurationPreview);
   });
-  document.querySelectorAll('input[name="hiruKyukei"], input[name="gogoKyukei"]').forEach((r) => {
-    r.addEventListener('change', updateZangyouDurationPreview);
-  });
+  setupKyukeiTwoStage_('hiruKyukei', updateZangyouDurationPreview);
+  setupKyukeiTwoStage_('gogoKyukei', updateZangyouDurationPreview);
 
   function loadZangyouRequests() {
     const listEl = document.getElementById('zangyouRequestsList');
@@ -1430,6 +1510,8 @@
     document.getElementById('zangyouEnd').value = req.endTime;
     setRadioValue('hiruKyukei', req.hiruKyukei || '');
     setRadioValue('gogoKyukei', req.gogoKyukei || '');
+    syncKyukeiTwoStageFromValue_('hiruKyukei', req.hiruKyukei || '');
+    syncKyukeiTwoStageFromValue_('gogoKyukei', req.gogoKyukei || '');
     document.getElementById('zangyouRiyu').value = req.riyu;
     updateZangyouKyukeiVisibility();
     updateZangyouDurationPreview();
@@ -1445,8 +1527,8 @@
     document.getElementById('zangyouDate').value = '';
     document.getElementById('zangyouStart').value = '';
     document.getElementById('zangyouEnd').value = '';
-    setRadioValue('hiruKyukei', '');
-    setRadioValue('gogoKyukei', '');
+    resetKyukeiTwoStage_('hiruKyukei');
+    resetKyukeiTwoStage_('gogoKyukei');
     document.getElementById('zangyouRiyu').value = '';
     document.getElementById('hiruKyukeiArea').classList.add('hidden');
     document.getElementById('gogoKyukeiArea').classList.add('hidden');
@@ -1541,7 +1623,7 @@
         const isHolidayWork = data.success && data.hasHoliday === true;
         hiruArea.classList.toggle('hidden', !isHolidayWork);
         gogoArea.classList.toggle('hidden', !isHolidayWork);
-        if (!isHolidayWork) { setRadioValue('chokkouHiruKyukei', ''); setRadioValue('chokkouGogoKyukei', ''); }
+        if (!isHolidayWork) { resetKyukeiTwoStage_('chokkouHiruKyukei'); resetKyukeiTwoStage_('chokkouGogoKyukei'); }
         updateChokkouDurationPreview();
       })
       .catch(() => {});
@@ -1560,8 +1642,10 @@
     if (!isHolidayWork || !start || !end) { el.classList.add('hidden'); return; }
     let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start);
     if (rawSpan <= 0) rawSpan += 24 * 60;
-    const hiruYes = getRadioValue('chokkouHiruKyukei') === 'はい';
-    const gogoYes = getRadioValue('chokkouGogoKyukei') === 'はい';
+    // 2026-10-25変更：回答の値が「いいえ」「はい（社内）」「はい（外出）」になったため、
+    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（ここは合計分数だけで足りる）
+    const hiruYes = getRadioValue('chokkouHiruKyukei').indexOf('はい') === 0;
+    const gogoYes = getRadioValue('chokkouGogoKyukei').indexOf('はい') === 0;
     const kyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
     let html = '';
     if (rawSpan >= 8 * 60 && kyukeiMin < 60) {
@@ -1576,9 +1660,8 @@
   ['chokkouShukkinTime', 'chokkouTaikinTime'].forEach((id) => {
     document.getElementById(id).addEventListener('input', updateChokkouDurationPreview);
   });
-  document.querySelectorAll('input[name="chokkouHiruKyukei"], input[name="chokkouGogoKyukei"]').forEach((r) => {
-    r.addEventListener('change', updateChokkouDurationPreview);
-  });
+  setupKyukeiTwoStage_('chokkouHiruKyukei', updateChokkouDurationPreview);
+  setupKyukeiTwoStage_('chokkouGogoKyukei', updateChokkouDurationPreview);
 
   function loadChokkouChokkiRequests() {
     const listEl = document.getElementById('chokkouChokkiRequestsList');
@@ -1627,6 +1710,8 @@
     document.getElementById('chokkouRiyu').value = req.riyu;
     setRadioValue('chokkouHiruKyukei', req.hiruKyukei || '');
     setRadioValue('chokkouGogoKyukei', req.gogoKyukei || '');
+    syncKyukeiTwoStageFromValue_('chokkouHiruKyukei', req.hiruKyukei || '');
+    syncKyukeiTwoStageFromValue_('chokkouGogoKyukei', req.gogoKyukei || '');
     updateChokkouFieldVisibility();
     updateChokkouKyukeiVisibility();
     document.getElementById('chokkouChokkiEditingNotice').style.display = 'block';
@@ -1644,8 +1729,8 @@
     document.getElementById('chokkouShukkinTime').value = '';
     document.getElementById('chokkouTaikinTime').value = '';
     document.getElementById('chokkouRiyu').value = '';
-    setRadioValue('chokkouHiruKyukei', '');
-    setRadioValue('chokkouGogoKyukei', '');
+    resetKyukeiTwoStage_('chokkouHiruKyukei');
+    resetKyukeiTwoStage_('chokkouGogoKyukei');
     updateChokkouFieldVisibility();
     updateChokkouKyukeiVisibility();
     document.getElementById('chokkouChokkiEditingNotice').style.display = 'none';
