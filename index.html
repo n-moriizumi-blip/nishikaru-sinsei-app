@@ -203,17 +203,10 @@
     color: var(--primary-ink);
   }
   #yukyuTokubetsuToggle {
-    /* 2026-10-24修正：button要素はブラウザ既定のフォント・余白を持ち、font-familyだけの
-       指定では完全にリセットされない（実機で字体が違って見えた）。font一括指定で
-       family/size/weight/line-heightをまとめて継承させる */
-    font: inherit;
-    color: inherit;
-    appearance: none;
-    -webkit-appearance: none;
-    box-sizing: border-box;
-    width: 100%;
-    /* グリッドの既定（align-items:stretch）だと、同じ行に並ぶ積立有給（2行表示で
-       縦に長い）に合わせて高さが引き伸ばされてしまうため、自分の内容分の高さだけに留める */
+    /* 2026-10-24再修正：button要素はfont:inheritを指定してもブラウザ既定の見た目が
+       完全には消えない実機報告があったため、button自体をやめてlabel要素に変更した
+       （HTML側参照）。ここではグリッドの既定（align-items:stretch）だと、同じ行に並ぶ
+       積立有給（2行表示で縦に長い）に合わせて高さが引き伸ばされてしまう問題だけ対応する */
     align-self: start;
   }
   #yukyuTokubetsuSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
@@ -731,7 +724,7 @@
          選ぶ2段階UIに整理した（7択が横並びで見づらいとの指摘）。このボタン自体は
          yukyuKbnの値を持たず、下のサブグループ（実際のinput）を開閉するだけ。
          最終的にサーバーへ送る値は変更していないため、スプレッドシート側の対応は不要 -->
-    <button type="button" class="radio-pill" id="yukyuTokubetsuToggle">特別休暇</button>
+    <label class="radio-pill" id="yukyuTokubetsuToggle" tabindex="0" role="button">特別休暇</label>
     <!-- 2026-10-24変更：積立有給を最後尾へ移動（ユーザー指定の並び順） -->
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
   </div>
@@ -1835,6 +1828,11 @@
   // 選択済みだった弔事/慶事/傷病等はクリアする（yukyuKbnの値を空に戻すため）
   document.getElementById('yukyuTokubetsuToggle').addEventListener('click', () => {
     document.getElementById('yukyuTokubetsuSubGroup').classList.toggle('hidden');
+  });
+  // label要素はEnter/Spaceキーで自動的にクリックされないため、キーボード操作でも
+  // 開閉できるようにする（button要素をやめたことによるアクセシビリティの穴埋め）
+  document.getElementById('yukyuTokubetsuToggle').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); }
   });
   document.getElementById('yukyuKbnGroup').addEventListener('change', (e) => {
     if (e.target.name !== 'yukyuKbn') return;
