@@ -210,6 +210,10 @@
     align-self: start;
   }
   #yukyuTokubetsuSubGroup, #yukyuKekkinSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
+  /* 2026-10-24新設：欠勤控除・特別休暇の2つのトグルは、幅によって列数が変わる
+     auto-fillだと必ず横並びになるとは限らないため、常に2列固定にして
+     「欠勤控除が左」の位置関係を保証する */
+  #yukyuKbnToggleGroup { grid-template-columns: repeat(2, 1fr); margin-top: 8px; }
   .primary-btn {
     width: 100%;
     margin-top: 26px;
@@ -718,10 +722,13 @@
   <label>有給種別／控除区分</label>
   <div class="radio-group" id="yukyuKbnGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="通常有給"> 通常有給</label>
-    <!-- 2026-10-24変更：サブグループを持つ2つ（欠勤控除・特別休暇）を最後尾へまとめ、
-         積立有給をその前に移動した（開いたサブグループがこの2つの直下に出るので
-         分かりやすい、というユーザー指定の並び順） -->
+    <!-- 2026-10-24変更：積立有給はここへ、サブグループを持つ2つ（欠勤控除・特別休暇）は
+         専用の2列グリッド（下）へ分けた。幅によって3列/2列と折り返しが変わる1つの
+         グリッドに全部まとめると、欠勤控除と特別休暇が同じ行に並ぶとは限らなかったため、
+         この2つだけ常に横並び（欠勤控除が左）になるよう固定した -->
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
+  </div>
+  <div class="radio-group" id="yukyuKbnToggleGroup">
     <!-- 2026-10-24変更（フェーズ3.5）：欠勤控除／欠勤控除（労災）も特別休暇と同じ
          2段階UIに整理した。トグル自体はyukyuKbnの値を持たず、下のサブグループ
          （実際のinput）を開閉するだけ。送信される値は変更していない -->
