@@ -873,6 +873,7 @@
     <div class="radio-group" id="yukyuRiyuPresetGroup">
       <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="私用"> 私用</label>
       <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="通院"> 通院</label>
+      <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="病気・ケガ"> 病気・ケガ</label>
       <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="人間ドック"> 人間ドック</label>
       <label class="radio-pill hidden" id="yukyuRiyuShoreiPill"><input type="radio" name="yukyuRiyuPreset" value="有給奨励日"> 有給奨励日</label>
       <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="その他"> その他（自由入力）</label>
@@ -1843,7 +1844,7 @@
   // 文字列と完全一致すればそのプリセットを選択、それ以外（自由記述）なら「その他」を選んで
   // テキスト欄にそのまま表示する。「有給奨励日」は対象日が既に当時の180日判定窓から外れて
   // いても（編集が時間を置いて行われた場合等）、履歴として選択肢自体を強制的に見せる
-  const YUKYU_RIYU_PRESETS_ = ['私用', '通院', '人間ドック', '有給奨励日'];
+  const YUKYU_RIYU_PRESETS_ = ['私用', '通院', '病気・ケガ', '人間ドック', '有給奨励日'];
   function restoreYukyuRiyuPreset_(riyu) {
     const textarea = document.getElementById('yukyuRiyu');
     if (YUKYU_RIYU_PRESETS_.includes(riyu)) {
