@@ -203,13 +203,18 @@
     color: var(--primary-ink);
   }
   #yukyuTokubetsuToggle {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
+    /* 2026-10-24修正：button要素はブラウザ既定のフォント・余白を持ち、font-familyだけの
+       指定では完全にリセットされない（実機で字体が違って見えた）。font一括指定で
+       family/size/weight/line-heightをまとめて継承させる */
+    font: inherit;
+    color: inherit;
     appearance: none;
     -webkit-appearance: none;
     box-sizing: border-box;
     width: 100%;
+    /* グリッドの既定（align-items:stretch）だと、同じ行に並ぶ積立有給（2行表示で
+       縦に長い）に合わせて高さが引き伸ばされてしまうため、自分の内容分の高さだけに留める */
+    align-self: start;
   }
   #yukyuTokubetsuSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
   .primary-btn {
