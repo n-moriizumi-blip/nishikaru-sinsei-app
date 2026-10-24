@@ -202,14 +202,14 @@
     font-weight: 700;
     color: var(--primary-ink);
   }
-  #yukyuTokubetsuToggle {
+  #yukyuTokubetsuToggle, #yukyuKekkinToggle {
     /* 2026-10-24再修正：button要素はfont:inheritを指定してもブラウザ既定の見た目が
        完全には消えない実機報告があったため、button自体をやめてlabel要素に変更した
        （HTML側参照）。ここではグリッドの既定（align-items:stretch）だと、同じ行に並ぶ
        積立有給（2行表示で縦に長い）に合わせて高さが引き伸ばされてしまう問題だけ対応する */
     align-self: start;
   }
-  #yukyuTokubetsuSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
+  #yukyuTokubetsuSubGroup, #yukyuKekkinSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
   .primary-btn {
     width: 100%;
     margin-top: 26px;
@@ -718,8 +718,10 @@
   <label>有給種別／控除区分</label>
   <div class="radio-group" id="yukyuKbnGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="通常有給"> 通常有給</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除"> 欠勤控除</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除（労災）"> 欠勤控除<span class="pill-sub">（労災）</span></label>
+    <!-- 2026-10-24変更（フェーズ3.5）：欠勤控除／欠勤控除（労災）も特別休暇と同じ
+         2段階UIに整理した。トグル自体はyukyuKbnの値を持たず、下のサブグループ
+         （実際のinput）を開閉するだけ。送信される値は変更していない -->
+    <label class="radio-pill" id="yukyuKekkinToggle" tabindex="0" role="button">欠勤控除</label>
     <!-- 2026-10-24変更（フェーズ3.5）：弔事/慶事/傷病等を選ぶ前に、まず「特別休暇」を
          選ぶ2段階UIに整理した（7択が横並びで見づらいとの指摘）。このボタン自体は
          yukyuKbnの値を持たず、下のサブグループ（実際のinput）を開閉するだけ。
@@ -727,6 +729,10 @@
     <label class="radio-pill" id="yukyuTokubetsuToggle" tabindex="0" role="button">特別休暇</label>
     <!-- 2026-10-24変更：積立有給を最後尾へ移動（ユーザー指定の並び順） -->
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
+  </div>
+  <div class="radio-group hidden" id="yukyuKekkinSubGroup">
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除"> 通常</label>
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除（労災）"> 労災</label>
   </div>
   <div class="radio-group hidden" id="yukyuTokubetsuSubGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（弔事）"> 弔事</label>
@@ -1728,8 +1734,10 @@
     const isKeiji      = kbn === '特別休暇（慶事）';
     const isShoubyou   = kbn === '傷病等特別休暇';
     const isTokubetsu  = isChouji || isKeiji || isShoubyou;
+    // 2026-10-24新設（フェーズ3.5）：欠勤控除2段階UIの同期用
+    const isKekkin     = kbn === '欠勤控除' || kbn === '欠勤控除（労災）';
     return {
-      kbn, shinsei, isYukyuGroup, isTsumitate, isChouji, isKeiji, isShoubyou, isTokubetsu,
+      kbn, shinsei, isYukyuGroup, isTsumitate, isChouji, isKeiji, isShoubyou, isTokubetsu, isKekkin,
       isFullDay   : isTsumitate || isTokubetsu || (isYukyuGroup && shinsei === '1日'),
       isSingleDate: isYukyuGroup && ['午前休（0.5日）', '午後休（0.5日）'].includes(shinsei),
       isTimeType  : isYukyuGroup && YUKYU_TIME_TYPES.includes(shinsei),
@@ -1772,13 +1780,18 @@
     document.getElementById('yukyuRiyuArea').classList.toggle('hidden', b.isTokubetsu);
     updateYukyuTodayWarning();
 
-    // 2026-10-24新設（フェーズ3.5）：特別休暇の2段階選択の同期。サブグループ（弔事/慶事/
-    // 傷病等）は、既にそのいずれかが選択済み（編集時の復元を含む）、またはトグルボタンが
-    // 押されて開いている間だけ表示する。親の「特別休暇」ボタンの選択中の見た目も合わせる
+    // 2026-10-24新設（フェーズ3.5）：特別休暇・欠勤控除の2段階選択の同期。サブグループは、
+    // 既にそのいずれかが選択済み（編集時の復元を含む）、またはトグルボタンが押されて
+    // 開いている間だけ表示する。親ボタンの選択中の見た目も合わせる
     const tokubetsuToggle = document.getElementById('yukyuTokubetsuToggle');
     const tokubetsuSub    = document.getElementById('yukyuTokubetsuSubGroup');
     tokubetsuToggle.classList.toggle('active', b.isTokubetsu);
     if (b.isTokubetsu) tokubetsuSub.classList.remove('hidden');
+
+    const kekkinToggle = document.getElementById('yukyuKekkinToggle');
+    const kekkinSub     = document.getElementById('yukyuKekkinSubGroup');
+    kekkinToggle.classList.toggle('active', b.isKekkin);
+    if (b.isKekkin) kekkinSub.classList.remove('hidden');
   }
 
   // 事後申請の時刻欄は、既定では触れなくてよいようにしておく（実際の打刻時刻をそのまま
@@ -1834,10 +1847,30 @@
   document.getElementById('yukyuTokubetsuToggle').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); }
   });
+  // 2026-10-24新設（フェーズ3.5）：欠勤控除の2段階選択。考え方は特別休暇と同じ
+  document.getElementById('yukyuKekkinToggle').addEventListener('click', () => {
+    document.getElementById('yukyuKekkinSubGroup').classList.toggle('hidden');
+  });
+  document.getElementById('yukyuKekkinToggle').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); }
+  });
+  // 他の（通常有給・積立有給）を選び直したら、開いていたサブグループは自動的に閉じ、
+  // 選択済みだった値はクリアする（yukyuKbnの値を空に戻すため）
   document.getElementById('yukyuKbnGroup').addEventListener('change', (e) => {
     if (e.target.name !== 'yukyuKbn') return;
     document.getElementById('yukyuTokubetsuSubGroup').classList.add('hidden');
     document.querySelectorAll('#yukyuTokubetsuSubGroup input').forEach((r) => { r.checked = false; });
+    document.getElementById('yukyuKekkinSubGroup').classList.add('hidden');
+    document.querySelectorAll('#yukyuKekkinSubGroup input').forEach((r) => { r.checked = false; });
+  });
+  // 欠勤控除のサブグループで選び直したら、特別休暇のサブグループは閉じる（逆も同様）
+  document.getElementById('yukyuKekkinSubGroup').addEventListener('change', () => {
+    document.getElementById('yukyuTokubetsuSubGroup').classList.add('hidden');
+    document.querySelectorAll('#yukyuTokubetsuSubGroup input').forEach((r) => { r.checked = false; });
+  });
+  document.getElementById('yukyuTokubetsuSubGroup').addEventListener('change', () => {
+    document.getElementById('yukyuKekkinSubGroup').classList.add('hidden');
+    document.querySelectorAll('#yukyuKekkinSubGroup input').forEach((r) => { r.checked = false; });
   });
   document.getElementById('yukyuSingleDate').addEventListener('change', () => { fetchYukyuActualTimes(); updateYukyuTodayWarning(); });
   ['yukyuShukkinYotei', 'yukyuTaikinYotei', 'yukyuGaishutsuYotei', 'yukyuKishaYotei',
