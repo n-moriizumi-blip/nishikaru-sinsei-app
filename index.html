@@ -718,6 +718,10 @@
   <label>有給種別／控除区分</label>
   <div class="radio-group" id="yukyuKbnGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="通常有給"> 通常有給</label>
+    <!-- 2026-10-24変更：サブグループを持つ2つ（欠勤控除・特別休暇）を最後尾へまとめ、
+         積立有給をその前に移動した（開いたサブグループがこの2つの直下に出るので
+         分かりやすい、というユーザー指定の並び順） -->
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
     <!-- 2026-10-24変更（フェーズ3.5）：欠勤控除／欠勤控除（労災）も特別休暇と同じ
          2段階UIに整理した。トグル自体はyukyuKbnの値を持たず、下のサブグループ
          （実際のinput）を開閉するだけ。送信される値は変更していない -->
@@ -727,8 +731,6 @@
          yukyuKbnの値を持たず、下のサブグループ（実際のinput）を開閉するだけ。
          最終的にサーバーへ送る値は変更していないため、スプレッドシート側の対応は不要 -->
     <label class="radio-pill" id="yukyuTokubetsuToggle" tabindex="0" role="button">特別休暇</label>
-    <!-- 2026-10-24変更：積立有給を最後尾へ移動（ユーザー指定の並び順） -->
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
   </div>
   <div class="radio-group hidden" id="yukyuKekkinSubGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除"> 通常</label>
@@ -1839,8 +1841,21 @@
   // 2026-10-24新設（フェーズ3.5）：特別休暇の2段階選択。トグルボタンでサブグループ
   // （弔事/慶事/傷病等）を開閉する。他の4つ（通常有給等）を選び直したら自動的に閉じ、
   // 選択済みだった弔事/慶事/傷病等はクリアする（yukyuKbnの値を空に戻すため）
+  // 2026-10-24変更：欠勤控除・特別休暇、2つのサブグループは同時に開かない（片方を開くと
+  // もう片方は閉じてクリアする）。そのための共通ヘルパー
+  function closeTokubetsuSub_() {
+    document.getElementById('yukyuTokubetsuSubGroup').classList.add('hidden');
+    document.querySelectorAll('#yukyuTokubetsuSubGroup input').forEach((r) => { r.checked = false; });
+  }
+  function closeKekkinSub_() {
+    document.getElementById('yukyuKekkinSubGroup').classList.add('hidden');
+    document.querySelectorAll('#yukyuKekkinSubGroup input').forEach((r) => { r.checked = false; });
+  }
   document.getElementById('yukyuTokubetsuToggle').addEventListener('click', () => {
-    document.getElementById('yukyuTokubetsuSubGroup').classList.toggle('hidden');
+    const sub = document.getElementById('yukyuTokubetsuSubGroup');
+    const willOpen = sub.classList.contains('hidden');
+    closeKekkinSub_();
+    sub.classList.toggle('hidden', !willOpen);
   });
   // label要素はEnter/Spaceキーで自動的にクリックされないため、キーボード操作でも
   // 開閉できるようにする（button要素をやめたことによるアクセシビリティの穴埋め）
@@ -1849,7 +1864,10 @@
   });
   // 2026-10-24新設（フェーズ3.5）：欠勤控除の2段階選択。考え方は特別休暇と同じ
   document.getElementById('yukyuKekkinToggle').addEventListener('click', () => {
-    document.getElementById('yukyuKekkinSubGroup').classList.toggle('hidden');
+    const sub = document.getElementById('yukyuKekkinSubGroup');
+    const willOpen = sub.classList.contains('hidden');
+    closeTokubetsuSub_();
+    sub.classList.toggle('hidden', !willOpen);
   });
   document.getElementById('yukyuKekkinToggle').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.target.click(); }
@@ -1858,20 +1876,12 @@
   // 選択済みだった値はクリアする（yukyuKbnの値を空に戻すため）
   document.getElementById('yukyuKbnGroup').addEventListener('change', (e) => {
     if (e.target.name !== 'yukyuKbn') return;
-    document.getElementById('yukyuTokubetsuSubGroup').classList.add('hidden');
-    document.querySelectorAll('#yukyuTokubetsuSubGroup input').forEach((r) => { r.checked = false; });
-    document.getElementById('yukyuKekkinSubGroup').classList.add('hidden');
-    document.querySelectorAll('#yukyuKekkinSubGroup input').forEach((r) => { r.checked = false; });
+    closeTokubetsuSub_();
+    closeKekkinSub_();
   });
   // 欠勤控除のサブグループで選び直したら、特別休暇のサブグループは閉じる（逆も同様）
-  document.getElementById('yukyuKekkinSubGroup').addEventListener('change', () => {
-    document.getElementById('yukyuTokubetsuSubGroup').classList.add('hidden');
-    document.querySelectorAll('#yukyuTokubetsuSubGroup input').forEach((r) => { r.checked = false; });
-  });
-  document.getElementById('yukyuTokubetsuSubGroup').addEventListener('change', () => {
-    document.getElementById('yukyuKekkinSubGroup').classList.add('hidden');
-    document.querySelectorAll('#yukyuKekkinSubGroup input').forEach((r) => { r.checked = false; });
-  });
+  document.getElementById('yukyuKekkinSubGroup').addEventListener('change', closeTokubetsuSub_);
+  document.getElementById('yukyuTokubetsuSubGroup').addEventListener('change', closeKekkinSub_);
   document.getElementById('yukyuSingleDate').addEventListener('change', () => { fetchYukyuActualTimes(); updateYukyuTodayWarning(); });
   ['yukyuShukkinYotei', 'yukyuTaikinYotei', 'yukyuGaishutsuYotei', 'yukyuKishaYotei',
    'yukyuW1s', 'yukyuW1e', 'yukyuW2s', 'yukyuW2e'].forEach((id) => {
