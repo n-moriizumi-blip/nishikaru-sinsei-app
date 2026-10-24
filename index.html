@@ -202,7 +202,15 @@
     font-weight: 700;
     color: var(--primary-ink);
   }
-  #yukyuTokubetsuToggle { font-family: inherit; }
+  #yukyuTokubetsuToggle {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    width: 100%;
+  }
   #yukyuTokubetsuSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
   .primary-btn {
     width: 100%;
@@ -712,7 +720,6 @@
   <label>有給種別／控除区分</label>
   <div class="radio-group" id="yukyuKbnGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="通常有給"> 通常有給</label>
-    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除"> 欠勤控除</label>
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="欠勤控除（労災）"> 欠勤控除<span class="pill-sub">（労災）</span></label>
     <!-- 2026-10-24変更（フェーズ3.5）：弔事/慶事/傷病等を選ぶ前に、まず「特別休暇」を
@@ -720,6 +727,8 @@
          yukyuKbnの値を持たず、下のサブグループ（実際のinput）を開閉するだけ。
          最終的にサーバーへ送る値は変更していないため、スプレッドシート側の対応は不要 -->
     <button type="button" class="radio-pill" id="yukyuTokubetsuToggle">特別休暇</button>
+    <!-- 2026-10-24変更：積立有給を最後尾へ移動（ユーザー指定の並び順） -->
+    <label class="radio-pill"><input type="radio" name="yukyuKbn" value="積立有給（傷病・介護のみ）"> 積立有給<span class="pill-sub">（傷病・介護のみ）</span></label>
   </div>
   <div class="radio-group hidden" id="yukyuTokubetsuSubGroup">
     <label class="radio-pill"><input type="radio" name="yukyuKbn" value="特別休暇（弔事）"> 弔事</label>
