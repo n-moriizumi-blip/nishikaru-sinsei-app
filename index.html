@@ -866,8 +866,18 @@
   </div>
 
   <div id="yukyuRiyuArea">
-    <label for="yukyuRiyu">理由・備考</label>
-    <textarea id="yukyuRiyu"></textarea>
+    <label>理由・備考</label>
+    <!-- 2026-10-24新設：よくある理由をプリセット選択できるようにし、当てはまらない場合だけ
+         自由入力する方式に変更（ユーザー要望）。プリセットを選ぶと下のテキスト欄にそのまま
+         反映され送信される（サーバー側のriyuは従来通りプレーンテキストのため変更不要） -->
+    <div class="radio-group" id="yukyuRiyuPresetGroup">
+      <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="私用"> 私用</label>
+      <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="通院"> 通院</label>
+      <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="人間ドック"> 人間ドック</label>
+      <label class="radio-pill hidden" id="yukyuRiyuShoreiPill"><input type="radio" name="yukyuRiyuPreset" value="有給奨励日"> 有給奨励日</label>
+      <label class="radio-pill"><input type="radio" name="yukyuRiyuPreset" value="その他"> その他（自由入力）</label>
+    </div>
+    <textarea id="yukyuRiyu" placeholder="「その他」を選ぶと自由に入力できます"></textarea>
   </div>
 
   <p class="today-warning-banner hidden" id="yukyuTodayWarning"></p>
@@ -998,6 +1008,15 @@
     window.open(GAS_URL + '?mode=jikankyu', '_blank');
   }
 
+  // 2026-10-24新設：有給申請の「理由・備考」プリセット選択で「有給奨励日」を対象日に応じて
+  // 出し分けるために、mode=yukyuShoreiの全件（180日以内）をここに保持する
+  // （loadYukyuShoreiBannerが取得する60日以内に絞った表示用ラベルとは別）
+  let YUKYU_SHOREI_DATES = [];
+  function isYukyuShoreiDate_(dateVal) {
+    if (!dateVal) return false;
+    return YUKYU_SHOREI_DATES.includes(String(dateVal).replace(/-/g, '/'));
+  }
+
   // 有給奨励日の案内（既存のmode=yukyuShorei、タブレット打刻画面のバナーと同じデータ元）。
   // 休暇申請フォームの案内文（60日以内）と同じ窓で、直近の該当日があれば「申請の種類を選ぶ」
   // 画面の上部に表示する
@@ -1006,6 +1025,7 @@
       .then((r) => r.json())
       .then((data) => {
         if (!data.success || !data.dates || data.dates.length === 0) return;
+        YUKYU_SHOREI_DATES = data.dates;
         const windowEnd = new Date(); windowEnd.setDate(windowEnd.getDate() + 60);
         const DOW_JP = ['日', '月', '火', '水', '木', '金', '土'];
         const labels = data.dates
@@ -1802,6 +1822,57 @@
     const kekkinSub     = document.getElementById('yukyuKekkinSubGroup');
     kekkinToggle.classList.toggle('active', b.isKekkin);
     if (b.isKekkin) kekkinSub.classList.remove('hidden');
+
+    updateYukyuRiyuShoreiVisibility_();
+  }
+
+  // 2026-10-24新設：理由・備考のプリセット選択。「その他」以外を選ぶとそのままテキスト欄へ
+  // 反映して編集不可にする（サーバーへ送る値=textareaの内容は従来通りプレーンテキストのまま）
+  function applyYukyuRiyuPreset_(value) {
+    const textarea = document.getElementById('yukyuRiyu');
+    if (value && value !== 'その他') {
+      textarea.value = value;
+      textarea.disabled = true;
+    } else {
+      if (textarea.disabled) textarea.value = ''; // プリセット→自由入力に切り替えた時だけ空にする
+      textarea.disabled = false;
+    }
+  }
+
+  // 2026-10-24新設：編集時に保存済みのriyuからプリセット選択を復元する。既知のプリセット
+  // 文字列と完全一致すればそのプリセットを選択、それ以外（自由記述）なら「その他」を選んで
+  // テキスト欄にそのまま表示する。「有給奨励日」は対象日が既に当時の180日判定窓から外れて
+  // いても（編集が時間を置いて行われた場合等）、履歴として選択肢自体を強制的に見せる
+  const YUKYU_RIYU_PRESETS_ = ['私用', '通院', '人間ドック', '有給奨励日'];
+  function restoreYukyuRiyuPreset_(riyu) {
+    const textarea = document.getElementById('yukyuRiyu');
+    if (YUKYU_RIYU_PRESETS_.includes(riyu)) {
+      if (riyu === '有給奨励日') document.getElementById('yukyuRiyuShoreiPill').classList.remove('hidden');
+      setRadioValue('yukyuRiyuPreset', riyu);
+      textarea.value = riyu;
+      textarea.disabled = true;
+    } else {
+      setRadioValue('yukyuRiyuPreset', 'その他');
+      textarea.value = riyu;
+      textarea.disabled = false;
+    }
+  }
+
+  // 2026-10-24新設：「有給奨励日」の選択肢は、現在選ばれている対象日（開始日または単一対象日、
+  // 申請種別によって参照する欄が違う）が実際の有給奨励日の時だけ表示する。表示中に選択済みの
+  // まま対象日を変更して該当しなくなった場合は、誤って送信されないよう選択を解除する
+  function updateYukyuRiyuShoreiVisibility_() {
+    const b = yukyuBranch();
+    let dateVal = '';
+    if (b.isFullDay) dateVal = document.getElementById('yukyuStartDate').value;
+    else if (b.isSingleDate || b.isTimeType) dateVal = document.getElementById('yukyuSingleDate').value;
+    const pill = document.getElementById('yukyuRiyuShoreiPill');
+    const show = isYukyuShoreiDate_(dateVal);
+    pill.classList.toggle('hidden', !show);
+    if (!show) {
+      const input = pill.querySelector('input');
+      if (input.checked) { input.checked = false; applyYukyuRiyuPreset_(''); }
+    }
   }
 
   // 事後申請の時刻欄は、既定では触れなくてよいようにしておく（実際の打刻時刻をそのまま
@@ -1890,7 +1961,13 @@
   // 欠勤控除のサブグループで選び直したら、特別休暇のサブグループは閉じる（逆も同様）
   document.getElementById('yukyuKekkinSubGroup').addEventListener('change', closeTokubetsuSub_);
   document.getElementById('yukyuTokubetsuSubGroup').addEventListener('change', closeKekkinSub_);
-  document.getElementById('yukyuSingleDate').addEventListener('change', () => { fetchYukyuActualTimes(); updateYukyuTodayWarning(); });
+  document.getElementById('yukyuSingleDate').addEventListener('change', () => { fetchYukyuActualTimes(); updateYukyuTodayWarning(); updateYukyuRiyuShoreiVisibility_(); });
+  document.getElementById('yukyuStartDate').addEventListener('change', updateYukyuRiyuShoreiVisibility_);
+  // 2026-10-24新設：理由・備考のプリセット選択
+  document.getElementById('yukyuRiyuPresetGroup').addEventListener('change', (e) => {
+    if (e.target.name !== 'yukyuRiyuPreset') return;
+    applyYukyuRiyuPreset_(e.target.value);
+  });
   ['yukyuShukkinYotei', 'yukyuTaikinYotei', 'yukyuGaishutsuYotei', 'yukyuKishaYotei',
    'yukyuW1s', 'yukyuW1e', 'yukyuW2s', 'yukyuW2e'].forEach((id) => {
     document.getElementById(id).addEventListener('input', updateYukyuDurationPreview);
@@ -2114,9 +2191,9 @@
     }
     document.getElementById('yukyuZokugaraDetail').value = (req.zokugara || '').replace('【喪主】', '');
     document.getElementById('yukyuShoubyoumei').value = req.detail || '';
-    document.getElementById('yukyuRiyu').value = req.riyu || '';
 
     updateYukyuFieldVisibility();
+    restoreYukyuRiyuPreset_(req.riyu || ''); // updateYukyuFieldVisibility()より後で呼ぶ（表示/非表示が決まった後に強制表示するため）
     document.getElementById('yukyuEditingNotice').style.display = 'block';
     document.getElementById('yukyuEditingNotice').textContent = '申請ID「' + req.appId + '」を編集中です。';
     document.getElementById('yukyuCancelEditBtn').classList.remove('hidden');
@@ -2140,6 +2217,8 @@
     setRadioValue('yukyuZokugaraChouji', '');
     setRadioValue('yukyuZokugaraKeiji', '');
     setRadioValue('yukyuMoshu', '');
+    setRadioValue('yukyuRiyuPreset', '');
+    document.getElementById('yukyuRiyu').disabled = false; // 2026-10-24新設：プリセット選択で無効化されていた場合に戻す
     updateYukyuFieldVisibility();
     document.getElementById('yukyuEditingNotice').style.display = 'none';
     document.getElementById('yukyuCancelEditBtn').classList.add('hidden');
