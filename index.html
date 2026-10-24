@@ -819,6 +819,8 @@
     <label for="yukyuKisan">起算日</label>
     <input type="date" id="yukyuKisan">
     <p class="hint" style="margin-top:-2px;" id="yukyuKisanHint"></p>
+    <!-- 2026-10-24新設：マイページの「続けて申請する」から来た場合だけ表示する注記 -->
+    <p class="hint hidden" style="margin-top:-2px;" id="yukyuKisanContinuedNote">※前回と同じ事由として扱うため、起算日は変更できません。別の事由の場合は、上で特別休暇を選び直してください。</p>
   </div>
 
   <div id="yukyuZokugaraChoujiArea" class="hidden">
@@ -1957,6 +1959,10 @@
     const willOpen = sub.classList.contains('hidden');
     closeKekkinSub_();
     sub.classList.toggle('hidden', !willOpen);
+    // 2026-10-24新設：ここから選び直した場合は、マイページ「続けて申請する」由来の
+    // 起算日ロックが残っていたら解除する（新しい事由として自由に入力できるようにする）
+    document.getElementById('yukyuKisan').readOnly = false;
+    document.getElementById('yukyuKisanContinuedNote').classList.add('hidden');
   });
   // label要素はEnter/Spaceキーで自動的にクリックされないため、キーボード操作でも
   // 開閉できるようにする（button要素をやめたことによるアクセシビリティの穴埋め）
@@ -2244,6 +2250,9 @@
     setRadioValue('yukyuMoshu', '');
     setRadioValue('yukyuRiyuPreset', '');
     document.getElementById('yukyuRiyu').disabled = false; // 2026-10-24新設：プリセット選択で無効化されていた場合に戻す
+    // 2026-10-24新設：マイページ「続けて申請する」で起算日を編集不可にしていた場合に戻す
+    document.getElementById('yukyuKisan').readOnly = false;
+    document.getElementById('yukyuKisanContinuedNote').classList.add('hidden');
     updateYukyuFieldVisibility();
     document.getElementById('yukyuEditingNotice').style.display = 'none';
     document.getElementById('yukyuCancelEditBtn').classList.add('hidden');
@@ -2400,6 +2409,8 @@
       .catch(() => { bodyEl.textContent = '取得中にエラーが発生しました。'; });
   }
 
+  // 2026-10-24新設：マイページの「続けて申請する」ボタンから参照する（インデックスでアクセス）
+  var MY_TOKUBETSU_ = [];
   function renderMyInfo(data) {
     const bodyEl = document.getElementById('myInfoBody');
     let html = '';
@@ -2447,11 +2458,18 @@
     }
 
     if (data.tokubetsu && data.tokubetsu.length > 0) {
+      MY_TOKUBETSU_ = data.tokubetsu;
       html += '<label>特別休暇</label>';
-      data.tokubetsu.forEach((t) => {
+      data.tokubetsu.forEach((t, idx) => {
         const choukaBadge = t.chouka ? '<span class="req-status" style="background:#FCE4D6;color:#7F0000;">' + t.chouka + '</span>' : '';
+        // 2026-10-24新設：弔事・慶事で残日数がある場合（バックエンドがkisan等を付加して
+        // いる時だけ）、続柄・起算日を引き継いで追加申請できる「続けて申請する」ボタンを出す。
+        // 傷病等・積立有給・残日数0は対象外（バックエンド側で既に絞り込み済み）
+        const continueBtn = t.kisan
+          ? '<button type="button" class="req-edit-btn" onclick="continueTokubetsu_(' + idx + ')" style="margin-top:8px;">続けて申請する</button>'
+          : '';
         html += '<div class="req-item"><div class="row"><strong>' + t.shinsei + (t.detail ? '（' + t.detail + '）' : '') + '</strong>' + choukaBadge + '</div>' +
-          '<div>残日数：' + t.zanNissu + '日' + (t.kigen ? '　使用期限：' + t.kigen : '') + '</div></div>';
+          '<div>残日数：' + t.zanNissu + '日' + (t.kigen ? '　使用期限：' + t.kigen : '') + '</div>' + continueBtn + '</div>';
       });
     }
 
@@ -2462,6 +2480,32 @@
     html += pendingRow('出張申請', data.pending.chokkouChokki, 'chokkouChokki');
 
     bodyEl.innerHTML = html;
+  }
+
+  // 2026-10-24新設：マイページの「続けて申請する」。弔事・慶事の種別・起算日・続柄・
+  // 続柄詳細・喪主を引き継いで有給申請画面を開く。起算日は飛び石の同一事由プール判定の
+  // キーになっているため、誤って別の値に変えると別の事由（二重付与）として扱われてしまう。
+  // そのため編集不可にする（ユーザー判断）。事前/事後・申請種別・対象日は空のまま、
+  // 本人に選んでもらう
+  function continueTokubetsu_(idx) {
+    const t = MY_TOKUBETSU_[idx];
+    if (!t || !t.kisan) return;
+    showSection('yukyu');
+    stopEditingYukyu(); // 新規申請として開始する（編集中・前回入力の状態をクリア）
+    setRadioValue('yukyuKbn', t.shinsei); // '特別休暇（弔事）' または '特別休暇（慶事）'
+    updateYukyuFieldVisibility();
+    document.getElementById('yukyuKisan').value = t.kisan.replace(/\//g, '-');
+    document.getElementById('yukyuKisan').readOnly = true;
+    document.getElementById('yukyuKisanContinuedNote').classList.remove('hidden');
+    if (t.shinsei === '特別休暇（弔事）') {
+      setRadioValue('yukyuZokugaraChouji', t.zokugaraChoice || '');
+      setRadioValue('yukyuMoshu', t.moshu ? 'はい' : 'いいえ');
+    } else if (t.shinsei === '特別休暇（慶事）') {
+      setRadioValue('yukyuZokugaraKeiji', t.zokugaraChoice || '');
+    }
+    document.getElementById('yukyuZokugaraDetail').value = t.zokugaraDetail || '';
+    updateYukyuFieldVisibility();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ============================================================
