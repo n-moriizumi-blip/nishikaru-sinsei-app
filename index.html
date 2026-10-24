@@ -210,10 +210,11 @@
     align-self: start;
   }
   #yukyuTokubetsuSubGroup, #yukyuKekkinSubGroup { margin-top: -2px; margin-bottom: 8px; padding-left: 14px; border-left: 2px solid var(--line); }
-  /* 2026-10-24新設：欠勤控除・特別休暇の2つのトグルは、幅によって列数が変わる
-     auto-fillだと必ず横並びになるとは限らないため、常に2列固定にして
-     「欠勤控除が左」の位置関係を保証する */
-  #yukyuKbnToggleGroup { grid-template-columns: repeat(2, 1fr); margin-top: 8px; }
+  /* 2026-10-24修正：repeat(2, 1fr)で2等分すると、通常有給等（3列auto-fillの1/3幅）より
+     箱が大きくなってしまっていた（ユーザー指摘）。.radio-group既定のauto-fillと
+     同じ列幅指定にして、他の選択肢と同じサイズに揃える（2つしか無いので折り返し点に
+     達するまでは自然に1行に収まり、「欠勤控除が左」の位置関係も保たれる） */
+  #yukyuKbnToggleGroup { margin-top: 8px; }
   .primary-btn {
     width: 100%;
     margin-top: 26px;
