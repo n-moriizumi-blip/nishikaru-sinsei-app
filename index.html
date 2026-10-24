@@ -761,6 +761,9 @@
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="中抜け"> 中抜け</label>
       <label class="radio-pill"><input type="radio" name="yukyuShinsei" value="遅刻・中抜け＋早退"> 遅刻・中抜け＋早退</label>
     </div>
+    <!-- 2026-10-24新設：弔事・慶事は就業規則変更で2時間単位・飛び石取得ができるようになった
+         ため、具体的な申請例をヘルプ文として表示する（ユーザー要望：やり方が分かりにくいため） -->
+    <p class="hint" id="yukyuChoujiKeijiShinseiHint"></p>
   </div>
 
   <div id="yukyuFullDayArea" class="hidden">
@@ -1733,7 +1736,11 @@
     const parts = s.split(':');
     return String(parts[0]).padStart(2, '0') + ':' + String(parts[1] || '00').padStart(2, '0');
   }
-  const YUKYU_GROUP_KBN = ['通常有給', '欠勤控除', '欠勤控除（労災）'];
+  // 2026-10-24変更：就業規則変更により弔事・慶事も「1日〜複数日／遅刻／早退／中抜け／
+  // 複数時間帯」の申請種別を持つようになった（2時間単位・飛び石取得に対応するため、
+  // 欠勤控除と同じ仕組みを流用）。傷病等特別休暇は従来通り連続取得が原則のため対象外のまま
+  // （実働時間から消化日数を自動計算する既存の仕組みで、半日が混在する連続休暇にも対応できる）
+  const YUKYU_GROUP_KBN = ['通常有給', '欠勤控除', '欠勤控除（労災）', '特別休暇（弔事）', '特別休暇（慶事）'];
   const YUKYU_TIME_TYPES = ['遅刻', '早退', '中抜け', '遅刻・中抜け＋早退'];
   // 2026-08-23新設：早退・午後休・遅刻中抜け＋早退・中抜けの対象日が「当日」のときだけ、
   // 送信前に一声かけてもらうための注意書きを表示する（種別によって文言を変える）
@@ -1769,7 +1776,11 @@
     const isKekkin     = kbn === '欠勤控除' || kbn === '欠勤控除（労災）';
     return {
       kbn, shinsei, isYukyuGroup, isTsumitate, isChouji, isKeiji, isShoubyou, isTokubetsu, isKekkin,
-      isFullDay   : isTsumitate || isTokubetsu || (isYukyuGroup && shinsei === '1日'),
+      // 2026-10-24変更：弔事・慶事がisYukyuGroupに入ったため、isFullDayを「isTokubetsu
+      // （弔事・慶事・傷病等まとめて）」から「isShoubyou（傷病等のみ、申請種別の選択肢が
+      // 無く常に開始日〜終了日）」に変更。弔事・慶事は申請種別で「1日」を選んだ時だけ
+      // isFullDayになる（他のisYukyuGroup種別と同じ扱い）
+      isFullDay   : isTsumitate || isShoubyou || (isYukyuGroup && shinsei === '1日'),
       isSingleDate: isYukyuGroup && ['午前休（0.5日）', '午後休（0.5日）'].includes(shinsei),
       isTimeType  : isYukyuGroup && YUKYU_TIME_TYPES.includes(shinsei),
     };
@@ -1783,6 +1794,16 @@
     document.querySelectorAll('.yukyu-halfday-pill').forEach((el) => {
       el.classList.toggle('hidden', b.kbn !== '通常有給');
     });
+    // 2026-10-24新設：弔事・慶事の具体的な申請例（複数パターン）
+    const choujiKeijiHint = document.getElementById('yukyuChoujiKeijiShinseiHint');
+    choujiKeijiHint.classList.toggle('hidden', !(b.isChouji || b.isKeiji));
+    if (b.isChouji || b.isKeiji) {
+      choujiKeijiHint.innerHTML =
+        '※申請例　' +
+        '①近い日に飛び石で休む（例：10/1と10/3に半日ずつ）→ 1件の申請で開始日10/1〜終了日10/3として出せば、間の10/2に出勤しても自動的に0日消化になります。' +
+        '②離れた日に飛び石で休む（例：10/1に1日休み、2週間後の10/15に役所手続きで半日）→ その都度別々の申請として出してください（起算日を両方同じ日付で入力すれば、自動的に同じ残日数から消化されます）。' +
+        '③2時間だけ早退・遅刻する（例：法要のため2時間だけ早退）→ 申請種別で「早退」を選び、退勤予定時刻を入力してください。';
+    }
 
     document.getElementById('yukyuFullDayArea').classList.toggle('hidden', !b.isFullDay);
     document.getElementById('yukyuSingleDateArea').classList.toggle('hidden', !b.isSingleDate && !b.isTimeType);
@@ -2128,10 +2149,13 @@
           const isWait = req.status === '承認待' || isDairiAdminUser;
           const period = req.startDate + (req.endDate !== req.startDate ? '〜' + req.endDate : '');
           const detailLine = req.riyu ? '理由：' + req.riyu : (req.detail ? '詳細：' + req.detail : '');
+          // 2026-10-24新設：弔事・慶事・欠勤控除は申請種別（遅刻等）だけでは種別が分からない
+          // ため、種別（kbn）が「通常有給」以外の場合は一覧にも表示する
+          const kbnLabel = (req.kbn && req.kbn !== '通常有給') ? req.kbn + '・' : '';
           const div = document.createElement('div');
           div.className = 'req-item';
           div.innerHTML =
-            '<div class="row"><strong>' + period + '　' + req.jizenGo + '・' + req.shinsei + '</strong>' +
+            '<div class="row"><strong>' + period + '　' + req.jizenGo + '・' + kbnLabel + req.shinsei + '</strong>' +
             '<span class="req-status" style="' + statusBadgeStyle(req.status) + '">' + req.status + '</span></div>' +
             '<div>' + (req.jikan ? '時間：' + req.jikan + '　' : '') + detailLine + '</div>';
           if (isWait) {
