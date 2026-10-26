@@ -1461,7 +1461,16 @@
       total = Math.max(0, Math.round(rawSpan - kyukeiMin));
     }
 
-    let html = '⏱ この内容だと 実残業 ' + Math.floor(total / 60) + '時間' + (total % 60) + '分の申請になります。';
+    // 2026-10-28追加：休日出勤の最終合計はGAS側（buildDakokuMap、集計.gs）で15分単位に
+    // 切り捨てられるため（2026-10-25導入）、ここで表示する「実残業」も同じ切り捨てを適用し、
+    // 実際に計上される値と一致させる。切り捨て前の値（労基法の休憩しきい値判定にはこちらを
+    // 引き続き使う、下記参照）も併記し、なぜ減ったか分かるようにする（ユーザー指摘：
+    // 「丸められたことはどこかに表示されるか」で発覚。田畑さんの実例＝6:42→6:30）
+    const displayTotal = isHolidayWork ? Math.floor(total / 15) * 15 : total;
+    let html = '⏱ この内容だと 実残業 ' + Math.floor(displayTotal / 60) + '時間' + (displayTotal % 60) + '分の申請になります。';
+    if (isHolidayWork && displayTotal !== total) {
+      html += '<span class="hint">（15分単位切り捨て前：' + Math.floor(total / 60) + '時間' + (total % 60) + '分）</span>';
+    }
     // 2026-10-28新設：控除された時間の内訳をそのまま表示する（ユーザー指摘：「引かれた
     // 時間を表示するようにできるか」）。休日出勤扱いの日で、何か控除がある場合のみ表示
     if (isHolidayWork && deductionParts.length > 0) {
