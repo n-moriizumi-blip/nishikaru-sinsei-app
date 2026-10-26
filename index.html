@@ -1407,11 +1407,16 @@
 
   // 対象日が「休日出勤扱いになる日」かどうかをGAS側（isWorkday、集計.gsと同じ判定）に確認し、
   // その日だけ昼休憩・午後休憩の質問を表示する（平日はそもそも質問自体を出さない）
+  // 2026-10-28新設：休日出勤扱いの日は、実際の外出・帰社打刻（zangyouGaishutsuPairs）も
+  // 取得しておく。休憩の「社内／外出」申告と実際の外出打刻を対応させた本当の控除額を
+  // プレビュー表示するために使う（ユーザー指摘：「外出した時間が引かれていないようだが、
+  // 引かれた時間を表示できるか」）
+  let zangyouGaishutsuPairs = [];
   function updateZangyouKyukeiVisibility() {
     const dateVal = document.getElementById('zangyouDate').value;
     const hiruArea = document.getElementById('hiruKyukeiArea');
     const gogoArea = document.getElementById('gogoKyukeiArea');
-    if (!dateVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); return; }
+    if (!dateVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); zangyouGaishutsuPairs = []; return; }
     const dateStr = dateVal.replace(/-/g, '/');
     fetch(GAS_URL + '?mode=checkWorkday&token=' + encodeURIComponent(idToken) + '&date=' + encodeURIComponent(dateStr))
       .then((r) => r.json())
@@ -1419,8 +1424,19 @@
         const isHolidayWork = data.success && data.isWorkday === false;
         hiruArea.classList.toggle('hidden', !isHolidayWork);
         gogoArea.classList.toggle('hidden', !isHolidayWork);
-        if (!isHolidayWork) { resetKyukeiTwoStage_('hiruKyukei'); resetKyukeiTwoStage_('gogoKyukei'); }
-        updateZangyouDurationPreview();
+        if (!isHolidayWork) {
+          resetKyukeiTwoStage_('hiruKyukei'); resetKyukeiTwoStage_('gogoKyukei');
+          zangyouGaishutsuPairs = [];
+          updateZangyouDurationPreview();
+          return;
+        }
+        fetch(GAS_URL + '?mode=getGaishutsuPairs&token=' + encodeURIComponent(idToken) + dairiParam() + '&date=' + encodeURIComponent(dateStr))
+          .then((r2) => r2.json())
+          .then((data2) => {
+            zangyouGaishutsuPairs = (data2.success && data2.pairs) ? data2.pairs : [];
+            updateZangyouDurationPreview();
+          })
+          .catch(() => { zangyouGaishutsuPairs = []; updateZangyouDurationPreview(); });
       })
       .catch(() => {});
   }
@@ -1435,27 +1451,48 @@
     if (!start || !end) { el.classList.add('hidden'); return; }
     let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start); // 休憩を引く前、開始〜終了の実働時間
     if (rawSpan <= 0) rawSpan += 24 * 60;
+    const hiru = getRadioValue('hiruKyukei');
+    const gogo = getRadioValue('gogoKyukei');
     // 2026-10-25変更：回答の値が「いいえ」「はい（社内）」「はい（外出）」になったため、
-    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（ここは合計分数だけで足りる）
-    const hiruYes = getRadioValue('hiruKyukei').indexOf('はい') === 0;
-    const gogoYes = getRadioValue('gogoKyukei').indexOf('はい') === 0;
-    let total = rawSpan;
-    if (hiruYes) total -= 45;
-    if (gogoYes) total -= 15;
-    total = Math.max(0, Math.round(total));
+    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（休憩取得ルールの注意判定用）
+    const hiruYes = hiru.indexOf('はい') === 0;
+    const gogoYes = gogo.indexOf('はい') === 0;
+    const isHolidayWork = !document.getElementById('hiruKyukeiArea').classList.contains('hidden');
+    // 2026-10-28変更：休日出勤扱いの日は、GAS側calcHolidayKyukeiDeduction_と同じ計算
+    // （calcHolidayKyukeiDeductionJs_）で、実際の外出・帰社打刻も含めた本当の控除額を使う
+    // （以前は昼45分／午後15分の固定控除だけで、私用外出等が一切反映されていなかった。
+    // 田畑さんのAPP141＝社内と回答していたが実際は外出していたケースで発覚）。
+    // 平日はこれまで通り固定45分／15分のままでよい（平日はcalcKyukeiKojoの一律控除で、
+    // 中抜けの打刻対応は申請不要のため）
+    let kyukeiMin, total, deductionParts = [];
+    if (isHolidayWork) {
+      const deduction = calcHolidayKyukeiDeductionJs_(hiru, gogo, zangyouGaishutsuPairs);
+      kyukeiMin = deduction.totalMin;
+      deductionParts = deduction.parts;
+      total = Math.max(0, Math.round(rawSpan - kyukeiMin));
+    } else {
+      kyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
+      total = Math.max(0, Math.round(rawSpan - kyukeiMin));
+    }
 
     let html = '⏱ この内容だと 実残業 ' + Math.floor(total / 60) + '時間' + (total % 60) + '分の申請になります。';
+    // 2026-10-28新設：控除された時間の内訳をそのまま表示する（ユーザー指摘：「引かれた
+    // 時間を表示するようにできるか」）。休日出勤扱いの日で、何か控除がある場合のみ表示
+    if (isHolidayWork && deductionParts.length > 0) {
+      html += '<br><span class="hint">休憩・外出控除 計' + minToHhmmJs(kyukeiMin) + '（' + deductionParts.join('／') + '）</span>';
+    }
 
     // 休日出勤の休憩取得ルールに対する注意（2026-08-11新設）。昼休憩・午後休憩の質問が
     // 表示されている＝休日出勤扱いの日のときだけ判定する。実働＝開始〜終了の生の時間
     // （休憩を引く前）で判定するのは、既存のサーバー側チェック（processDakoku、打刻.gs）と
-    // 同じ考え方（実働6時間以上で休憩45分、8時間以上で休憩60分が必要）
-    const isHolidayWork = !document.getElementById('hiruKyukeiArea').classList.contains('hidden');
+    // 同じ考え方（実働6時間以上で休憩45分、8時間以上で休憩60分が必要）。この注意自体は
+    // 社内・外出を区別しない申告ベースの合計（45分／15分の単純合計）のままでよい
+    // （実際に休憩を取ったかどうかの労務コンプライアンス確認のため）
     if (isHolidayWork) {
-      const kyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
-      if (rawSpan >= 8 * 60 && kyukeiMin < 60) {
+      const declaredKyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
+      if (rawSpan >= 8 * 60 && declaredKyukeiMin < 60) {
         html += '<br><span style="color:#B00020;">⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。</span>';
-      } else if (rawSpan >= 6 * 60 && kyukeiMin < 45) {
+      } else if (rawSpan >= 6 * 60 && declaredKyukeiMin < 45) {
         html += '<br><span style="color:#B00020;">⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。</span>';
       }
     }
@@ -1608,12 +1645,16 @@
   // 2026-09-20新設：残業申請のupdateZangyouKyukeiVisibilityと同じ考え方。開始日〜終了日の
   // 範囲内にどこか休日出勤扱いの日が1日でもあれば、昼休憩・午後休憩の質問を表示する
   // （出張届は複数日にまたがるためendDateも渡してGAS側〈mode=checkWorkday〉で判定する）
+  // 2026-10-28新設：残業申請のzangyouGaishutsuPairsと同じ考え方。複数日にまたがる場合も
+  // 開始日の分だけ取得する（プレビュー自体が開始日の出勤・退勤予定時刻だけを見る既存の
+  // 簡略化と合わせている）
+  let chokkouGaishutsuPairs = [];
   function updateChokkouKyukeiVisibility() {
     const startVal = document.getElementById('chokkouStartDate').value;
     const endVal   = document.getElementById('chokkouEndDate').value || startVal;
     const hiruArea = document.getElementById('chokkouHiruKyukeiArea');
     const gogoArea = document.getElementById('chokkouGogoKyukeiArea');
-    if (!startVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); return; }
+    if (!startVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); chokkouGaishutsuPairs = []; return; }
     const startStr = startVal.replace(/-/g, '/');
     const endStr   = endVal.replace(/-/g, '/');
     fetch(GAS_URL + '?mode=checkWorkday&token=' + encodeURIComponent(idToken) +
@@ -1623,8 +1664,19 @@
         const isHolidayWork = data.success && data.hasHoliday === true;
         hiruArea.classList.toggle('hidden', !isHolidayWork);
         gogoArea.classList.toggle('hidden', !isHolidayWork);
-        if (!isHolidayWork) { resetKyukeiTwoStage_('chokkouHiruKyukei'); resetKyukeiTwoStage_('chokkouGogoKyukei'); }
-        updateChokkouDurationPreview();
+        if (!isHolidayWork) {
+          resetKyukeiTwoStage_('chokkouHiruKyukei'); resetKyukeiTwoStage_('chokkouGogoKyukei');
+          chokkouGaishutsuPairs = [];
+          updateChokkouDurationPreview();
+          return;
+        }
+        fetch(GAS_URL + '?mode=getGaishutsuPairs&token=' + encodeURIComponent(idToken) + dairiParam() + '&date=' + encodeURIComponent(startStr))
+          .then((r2) => r2.json())
+          .then((data2) => {
+            chokkouGaishutsuPairs = (data2.success && data2.pairs) ? data2.pairs : [];
+            updateChokkouDurationPreview();
+          })
+          .catch(() => { chokkouGaishutsuPairs = []; updateChokkouDurationPreview(); });
       })
       .catch(() => {});
   }
@@ -1642,20 +1694,29 @@
     if (!isHolidayWork || !start || !end) { el.classList.add('hidden'); return; }
     let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start);
     if (rawSpan <= 0) rawSpan += 24 * 60;
+    const hiru = getRadioValue('chokkouHiruKyukei');
+    const gogo = getRadioValue('chokkouGogoKyukei');
     // 2026-10-25変更：回答の値が「いいえ」「はい（社内）」「はい（外出）」になったため、
-    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（ここは合計分数だけで足りる）
-    const hiruYes = getRadioValue('chokkouHiruKyukei').indexOf('はい') === 0;
-    const gogoYes = getRadioValue('chokkouGogoKyukei').indexOf('はい') === 0;
-    const kyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
+    // 社内・外出を区別せず「はい」で始まるかどうかだけ見る（休憩取得ルールの注意判定用）
+    const hiruYes = hiru.indexOf('はい') === 0;
+    const gogoYes = gogo.indexOf('はい') === 0;
+    const declaredKyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
     let html = '';
-    if (rawSpan >= 8 * 60 && kyukeiMin < 60) {
-      html = '⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。';
-    } else if (rawSpan >= 6 * 60 && kyukeiMin < 45) {
-      html = '⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。';
+    if (rawSpan >= 8 * 60 && declaredKyukeiMin < 60) {
+      html = '<span style="color:#B00020;">⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。</span>';
+    } else if (rawSpan >= 6 * 60 && declaredKyukeiMin < 45) {
+      html = '<span style="color:#B00020;">⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。</span>';
+    }
+    // 2026-10-28新設：実際の外出・帰社打刻も含めた本当の控除額を内訳付きで表示する
+    // （残業申請のupdateZangyouDurationPreviewと同じ、calcHolidayKyukeiDeductionJs_を使う。
+    // ユーザー指摘：「外出した時間が引かれていないようだが、引かれた時間を表示できるか」）
+    const deduction = calcHolidayKyukeiDeductionJs_(hiru, gogo, chokkouGaishutsuPairs);
+    if (deduction.parts.length > 0) {
+      html += (html ? '<br>' : '') + '<span class="hint">休憩・外出控除 計' + minToHhmmJs(deduction.totalMin) + '（' + deduction.parts.join('／') + '）</span>';
     }
     if (!html) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    el.innerHTML = '<span style="color:#B00020;">' + html + '</span>';
+    el.innerHTML = html;
   }
   ['chokkouShukkinTime', 'chokkouTaikinTime'].forEach((id) => {
     document.getElementById(id).addEventListener('input', updateChokkouDurationPreview);
@@ -1806,6 +1867,45 @@
   }
   function floorTo15MinJs(min) { return Math.floor(min / 15) * 15; }
   function ceilTo15MinJs(min)  { return Math.ceil(min / 15) * 15; }
+  function minToHhmmJs(min) {
+    const m = Math.max(0, Math.round(min));
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+  // 2026-10-28新設：GAS側calcHolidayKyukeiDeduction_（集計.gs）と同じ計算をフロント側で複製。
+  // 休日出勤扱いの日の昼休憩・午後休憩（いいえ／はい（社内）／はい（外出））の申告を、
+  // 実際の外出・帰社打刻（gaishutsuPairs、時系列順）と対応させて、実際に控除される
+  // 合計分数・内訳を計算する（残業申請・出張届のリアルタイムプレビュー用。
+  // ユーザー指摘：「外出した時間が引かれていないようだが、引かれた時間を表示できるか」）。
+  // GAS側のロジックを変更したら、こちらも対で見直すこと
+  function calcHolidayKyukeiDeductionJs_(hiru, gogo, gaishutsuPairs) {
+    const pairs = (gaishutsuPairs || []).slice().sort((a, b) => a[0] - b[0]);
+    let total = 0, idx = 0;
+    const parts = [];
+    [{ kbn: hiru, label: '昼', allowance: 45 }, { kbn: gogo, label: '午後', allowance: 15 }].forEach((b) => {
+      if (b.kbn === 'はい（社内）') {
+        total += b.allowance;
+        parts.push(b.label + '・社内' + b.allowance + '分');
+      } else if (b.kbn === 'はい（外出）') {
+        if (idx < pairs.length) {
+          const g = pairs[idx][0], k = pairs[idx][1];
+          const applied = Math.max(k - g, b.allowance);
+          total += applied;
+          parts.push(b.label + '・外出' + minToHhmmJs(g) + '〜' + minToHhmmJs(k) + '（' + applied + '分）');
+          idx++;
+        } else {
+          total += b.allowance;
+          parts.push(b.label + '・外出（打刻なし、申告通り' + b.allowance + '分）');
+        }
+      }
+    });
+    for (; idx < pairs.length; idx++) {
+      const g = pairs[idx][0], k = pairs[idx][1];
+      const dur = k - g;
+      total += dur;
+      parts.push('私用外出' + minToHhmmJs(g) + '〜' + minToHhmmJs(k) + '（' + dur + '分）');
+    }
+    return { totalMin: total, parts: parts };
+  }
   // 2026-10-12新設：GAS側overlapMinutesWithBreaks（ユーティリティ.gs）・時間休計算ツールの
   // overlapMinutesWithBreaksと同じロジック。期間[a,b]が昼休憩(12:00-12:45)・
   // 午後休憩(15:00-15:15)とどれだけ重なるかの合計（分）を返す
