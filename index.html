@@ -1469,16 +1469,19 @@
     }
 
     // 休日出勤の休憩取得ルールに対する注意（2026-08-11新設）。昼休憩・午後休憩の質問が
-    // 表示されている＝休日出勤扱いの日のときだけ判定する。実働＝開始〜終了の生の時間
-    // （休憩を引く前）で判定するのは、既存のサーバー側チェック（processDakoku、打刻.gs）と
-    // 同じ考え方（実働6時間以上で休憩45分、8時間以上で休憩60分が必要）。この注意自体は
-    // 社内・外出を区別しない申告ベースの合計（45分／15分の単純合計）のままでよい
-    // （実際に休憩を取ったかどうかの労務コンプライアンス確認のため）
+    // 表示されている＝休日出勤扱いの日のときだけ判定する。しきい値の判定対象は社内・外出を
+    // 区別しない申告ベースの合計（declaredKyukeiMin、45分／15分の単純合計）のままでよい
+    // （実際に休憩を取ったかどうかの労務コンプライアンス確認のため）。
+    // 【2026-10-28修正】6時間/8時間を超えているかどうかの判定は、以前は休憩を一切引く前の
+    // 生の時間（rawSpan）を使っていたが、既に私用外出分が控除された後の「実残業」の表示
+    // （上のtotal）と基準がズレ、「実残業7時間42分なのに実働8時間以上として扱われる」という
+    // 矛盾した表示になっていた（ユーザー指摘）。私用外出は労働時間ではないため、しきい値の
+    // 判定も控除後のtotalを基準にするよう修正した（表示している実残業の時間と判定基準を揃える）
     if (isHolidayWork) {
       const declaredKyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
-      if (rawSpan >= 8 * 60 && declaredKyukeiMin < 60) {
+      if (total >= 8 * 60 && declaredKyukeiMin < 60) {
         html += '<br><span style="color:#B00020;">⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。</span>';
-      } else if (rawSpan >= 6 * 60 && declaredKyukeiMin < 45) {
+      } else if (total >= 6 * 60 && declaredKyukeiMin < 45) {
         html += '<br><span style="color:#B00020;">⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。</span>';
       }
     }
@@ -1687,16 +1690,21 @@
     const hiruYes = hiru.indexOf('はい') === 0;
     const gogoYes = gogo.indexOf('はい') === 0;
     const declaredKyukeiMin = (hiruYes ? 45 : 0) + (gogoYes ? 15 : 0);
-    let html = '';
-    if (rawSpan >= 8 * 60 && declaredKyukeiMin < 60) {
-      html = '<span style="color:#B00020;">⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。</span>';
-    } else if (rawSpan >= 6 * 60 && declaredKyukeiMin < 45) {
-      html = '<span style="color:#B00020;">⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。</span>';
-    }
     // 2026-10-28新設：実際の外出・帰社打刻も含めた本当の控除額を内訳付きで表示する
     // （残業申請のupdateZangyouDurationPreviewと同じ、calcHolidayKyukeiDeductionJs_を使う。
     // ユーザー指摘：「外出した時間が引かれていないようだが、引かれた時間を表示できるか」）
     const deduction = calcHolidayKyukeiDeductionJs_(hiru, gogo, chokkouGaishutsuPairs);
+    // 【2026-10-28修正】6時間/8時間を超えているかどうかの判定は、以前は休憩を一切引く前の
+    // 生の時間（rawSpan）を使っていたため、私用外出が控除された後の控除内訳表示と基準が
+    // ズレ、矛盾した表示になっていた（残業申請と同じ理由、ユーザー指摘）。私用外出は
+    // 労働時間ではないため、しきい値の判定も控除後の実働時間（total）を基準にする
+    const total = Math.max(0, Math.round(rawSpan - deduction.totalMin));
+    let html = '';
+    if (total >= 8 * 60 && declaredKyukeiMin < 60) {
+      html = '<span style="color:#B00020;">⚠️ 実働8時間以上のため、休憩60分（昼45分＋午後15分）以上の取得が必要です。</span>';
+    } else if (total >= 6 * 60 && declaredKyukeiMin < 45) {
+      html = '<span style="color:#B00020;">⚠️ 実働6時間以上のため、休憩45分以上の取得が必要です。</span>';
+    }
     if (deduction.parts.length > 0) {
       html += (html ? '<br>' : '') + '<span class="hint">休憩・外出控除 計' + minToHhmmJs(deduction.totalMin) + '（' + deduction.parts.join('／') + '）</span>';
     }
