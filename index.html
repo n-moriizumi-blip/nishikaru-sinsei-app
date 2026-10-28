@@ -591,9 +591,11 @@
 
   <label for="zangyouStart">残業開始時刻</label>
   <input type="time" id="zangyouStart">
+  <p class="hint hidden" id="zangyouStartActual" style="margin-top:-2px;"></p>
 
   <label for="zangyouEnd">予定終了時刻</label>
   <input type="time" id="zangyouEnd">
+  <p class="hint hidden" id="zangyouEndActual" style="margin-top:-2px;"></p>
 
   <div id="hiruKyukeiArea" class="hidden">
     <label>昼休憩（45分間）を取りましたか？</label>
@@ -1398,11 +1400,45 @@
   // プレビュー表示するために使う（ユーザー指摘：「外出した時間が引かれていないようだが、
   // 引かれた時間を表示できるか」）
   let zangyouGaishutsuPairs = [];
+  // 2026-10-28新設：事後に残業申請する場合、既に打刻済みのことが多いため、各入力欄の下に
+  // 実際の打刻時刻を参考表示する（自動入力はしない、本人が時刻を入力する際の参考情報）。
+  // 打刻が無い日は表示しない。平日の開始時刻だけは対象外（ユーザー指定：平日残業の開始は
+  // 定時後が通常で、朝の出勤打刻を表示しても参考にならず紛らわしいため）
+  function updateZangyouActualPunchHints_(dateStr, isHolidayWork) {
+    const startEl = document.getElementById('zangyouStartActual');
+    const endEl   = document.getElementById('zangyouEndActual');
+    if (!dateStr || !idToken) { startEl.classList.add('hidden'); endEl.classList.add('hidden'); return; }
+    fetch(GAS_URL + '?mode=getActualPunch&token=' + encodeURIComponent(idToken) + dairiParam() +
+      '&date=' + encodeURIComponent(dateStr) + '&dakokuType=' + encodeURIComponent('出勤,退勤'))
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) { startEl.classList.add('hidden'); endEl.classList.add('hidden'); return; }
+        const shukkin = data.times && data.times['出勤'];
+        const taikin  = data.times && data.times['退勤'];
+        if (isHolidayWork && shukkin) {
+          startEl.textContent = '実際の出勤：' + shukkin;
+          startEl.classList.remove('hidden');
+        } else {
+          startEl.classList.add('hidden');
+        }
+        if (taikin) {
+          endEl.textContent = '実際の退勤：' + taikin;
+          endEl.classList.remove('hidden');
+        } else {
+          endEl.classList.add('hidden');
+        }
+      })
+      .catch(() => { startEl.classList.add('hidden'); endEl.classList.add('hidden'); });
+  }
   function updateZangyouKyukeiVisibility() {
     const dateVal = document.getElementById('zangyouDate').value;
     const hiruArea = document.getElementById('hiruKyukeiArea');
     const gogoArea = document.getElementById('gogoKyukeiArea');
-    if (!dateVal || !idToken) { hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); zangyouGaishutsuPairs = []; return; }
+    if (!dateVal || !idToken) {
+      hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); zangyouGaishutsuPairs = [];
+      updateZangyouActualPunchHints_('', false);
+      return;
+    }
     const dateStr = dateVal.replace(/-/g, '/');
     fetch(GAS_URL + '?mode=checkWorkday&token=' + encodeURIComponent(idToken) + '&date=' + encodeURIComponent(dateStr))
       .then((r) => r.json())
@@ -1410,6 +1446,7 @@
         const isHolidayWork = data.success && data.isWorkday === false;
         hiruArea.classList.toggle('hidden', !isHolidayWork);
         gogoArea.classList.toggle('hidden', !isHolidayWork);
+        updateZangyouActualPunchHints_(dateStr, isHolidayWork);
         if (!isHolidayWork) {
           resetKyukeiTwoStage_('hiruKyukei'); resetKyukeiTwoStage_('gogoKyukei');
           zangyouGaishutsuPairs = [];
@@ -1567,6 +1604,8 @@
     document.getElementById('zangyouRiyu').value = '';
     document.getElementById('hiruKyukeiArea').classList.add('hidden');
     document.getElementById('gogoKyukeiArea').classList.add('hidden');
+    document.getElementById('zangyouStartActual').classList.add('hidden');
+    document.getElementById('zangyouEndActual').classList.add('hidden');
     document.getElementById('zangyouDurationPreview').classList.add('hidden');
     document.getElementById('zangyouEditingNotice').style.display = 'none';
     document.getElementById('zangyouCancelEditBtn').classList.add('hidden');
