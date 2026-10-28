@@ -591,11 +591,11 @@
 
   <label for="zangyouStart">残業開始時刻</label>
   <input type="time" id="zangyouStart">
-  <p class="hint hidden" id="zangyouStartActual" style="margin-top:-2px;"></p>
+  <p class="hint hidden" id="zangyouStartActual"></p>
 
   <label for="zangyouEnd">予定終了時刻</label>
   <input type="time" id="zangyouEnd">
-  <p class="hint hidden" id="zangyouEndActual" style="margin-top:-2px;"></p>
+  <p class="hint hidden" id="zangyouEndActual"></p>
 
   <div id="hiruKyukeiArea" class="hidden">
     <label>昼休憩（45分間）を取りましたか？</label>
@@ -674,18 +674,18 @@
 
   <label for="chokkouEndDate">終了日</label>
   <input type="date" id="chokkouEndDate">
-  <p class="hint" style="margin-top:-2px;">※単日の場合は開始日と同じ日付にしてください（出張等、複数日にまたがる場合のみ違う日付にしてください）</p>
+  <p class="hint">※単日の場合は開始日と同じ日付にしてください（出張等、複数日にまたがる場合のみ違う日付にしてください）</p>
 
   <div id="chokkouShukkinArea" class="hidden">
     <label for="chokkouShukkinTime">出勤予定時刻</label>
     <input type="time" id="chokkouShukkinTime">
-    <p class="hint" style="margin-top:-2px;">※空欄の場合は定時通りとみなします。</p>
+    <p class="hint">※空欄の場合は定時通りとみなします。</p>
   </div>
 
   <div id="chokkouTaikinArea" class="hidden">
     <label for="chokkouTaikinTime">退勤予定時刻</label>
     <input type="time" id="chokkouTaikinTime">
-    <p class="hint" style="margin-top:-2px;">※空欄の場合は定時通りとみなします。</p>
+    <p class="hint">※空欄の場合は定時通りとみなします。</p>
   </div>
 
   <!-- 2026-10-28変更：出張はもともと社外にいるため「社内で休憩／外出して休憩」の
@@ -796,7 +796,7 @@
     <input type="date" id="yukyuStartDate">
     <label for="yukyuEndDate">終了日</label>
     <input type="date" id="yukyuEndDate">
-    <p class="hint" style="margin-top:-2px;">※単日の場合は開始日と同じ日付にしてください</p>
+    <p class="hint">※単日の場合は開始日と同じ日付にしてください</p>
   </div>
 
   <div id="yukyuSingleDateArea" class="hidden">
@@ -843,9 +843,9 @@
   <div id="yukyuKisanArea" class="hidden">
     <label for="yukyuKisan">起算日</label>
     <input type="date" id="yukyuKisan">
-    <p class="hint" style="margin-top:-2px;" id="yukyuKisanHint"></p>
+    <p class="hint" id="yukyuKisanHint"></p>
     <!-- 2026-10-24新設：マイページの「続けて申請する」から来た場合だけ表示する注記 -->
-    <p class="hint hidden" style="margin-top:-2px;" id="yukyuKisanContinuedNote">※前回と同じ事由として扱うため、起算日は変更できません。別の事由の場合は、上で特別休暇を選び直してください。</p>
+    <p class="hint hidden" id="yukyuKisanContinuedNote">※前回と同じ事由として扱うため、起算日は変更できません。別の事由の場合は、上で特別休暇を選び直してください。</p>
   </div>
 
   <div id="yukyuZokugaraChoujiArea" class="hidden">
