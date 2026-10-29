@@ -1780,26 +1780,17 @@
     // 2026-10-29修正：直行のみ／直帰のみでは、表示されていない方の時刻欄が前回入力時の値を
     // 保持したまま隠れているだけで出張届の対象外。その値をそのまま使うと誤った実績が
     // 表示される不具合があった（ユーザー指摘：「直帰のみ」なのに出勤側の古い値が使われていた）。
-    // 直帰のみ＝実際の出勤打刻、直行のみ＝実際の退勤打刻を基準にする
-    // （writeChokkouChokkiPunches_がその側の打刻を一切生成しないのと同じ考え方）
+    // 直帰のみ＝出勤側、直行のみ＝退勤側を、実際の打刻（あれば）または定時（無ければ）で
+    // 補う。出張届は事前提出が多く、その時点では実際の打刻がまだ無いのが普通なので、
+    // 「打刻が無いので計算できない」ではなく定時通りと仮定した見込み表示にする
+    // （ユーザー指摘：「この届をもって打刻が付くので、打刻があるはずがない」。
+    // writeChokkouChokkiPunches_が空欄時に定時を使うのと同じ考え方＝shukkinTimeStr||shain.teijiStart）
     let start, end;
     if (shinsei === '直行・直帰') { start = shukkinInput; end = taikinInput; }
-    else if (shinsei === '直帰のみ') { start = chokkouActualShukkin; end = taikinInput; }
-    else if (shinsei === '直行のみ') { start = shukkinInput; end = chokkouActualTaikin; }
+    else if (shinsei === '直帰のみ') { start = chokkouActualShukkin || chokkouTeijiStart; end = taikinInput; }
+    else if (shinsei === '直行のみ') { start = shukkinInput; end = chokkouActualTaikin || chokkouTeijiEnd; }
     else { start = ''; end = ''; }
     if (!start || !end) {
-      // 直行のみ／直帰のみで、実際の打刻がまだ無いために計算できない場合だけ案内を出す
-      // （種別未選択・時刻未入力の通常ケースでは何も表示しない）
-      if (shinsei === '直帰のみ' && taikinInput && !chokkouActualShukkin) {
-        el.classList.remove('hidden');
-        el.innerHTML = '<span class="hint">まだ出勤の打刻が確認できないため、実績はまだ表示できません。</span>';
-        return;
-      }
-      if (shinsei === '直行のみ' && shukkinInput && !chokkouActualTaikin) {
-        el.classList.remove('hidden');
-        el.innerHTML = '<span class="hint">まだ退勤の打刻が確認できないため、実績はまだ表示できません。</span>';
-        return;
-      }
       el.classList.add('hidden');
       return;
     }
