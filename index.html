@@ -1681,7 +1681,7 @@
     chokkouTaikinArea.classList.toggle('hidden', shinsei !== '直帰のみ' && shinsei !== '直行・直帰');
   }
   document.querySelectorAll('input[name="chokkouShinsei"]').forEach((r) => {
-    r.addEventListener('change', updateChokkouFieldVisibility);
+    r.addEventListener('change', () => { updateChokkouFieldVisibility(); updateChokkouDurationPreview(); });
   });
 
   // 2026-09-20新設：残業申請のupdateZangyouKyukeiVisibilityと同じ考え方。開始日〜終了日の
@@ -1695,17 +1695,33 @@
   // 残業として計上される（2026-10-27の仕様変更）。この「定時を超えた分」の計算に対象社員の
   // 定時始業・定時終業が必要なため、対象日が決まるたびmode=getActualPunchで取得しておく
   // （dakokuTypeは計算に使わないので固定で'出勤'を指定するだけでよい）
+  // 2026-10-29拡張：定時に加え、対象日の実際の出勤・退勤打刻も一緒に取得する（1回のgetActualPunch
+  // 呼び出しで両方まとめて返ってくるため追加コストなし）。「直行のみ」「直帰のみ」では、
+  // 表示されていない方の時刻欄（chokkouShukkinTime／chokkouTaikinTime）が前回入力時の値を
+  // 保持したまま隠れているだけで出張届の対象外（writeChokkouChokkiPunches_はその側の打刻を
+  // 一切生成せず、通常の実打刻をそのまま使う）。プレビューでもこの隠れた値を使わず、
+  // 実際の打刻（無ければ計算不可として非表示）を使う
   let chokkouTeijiStart = '', chokkouTeijiEnd = '';
-  function fetchChokkouTeiji_(dateStr) {
-    if (!dateStr || !idToken) { chokkouTeijiStart = ''; chokkouTeijiEnd = ''; return Promise.resolve(); }
+  let chokkouActualShukkin = '', chokkouActualTaikin = '';
+  function fetchChokkouContext_(dateStr) {
+    if (!dateStr || !idToken) {
+      chokkouTeijiStart = ''; chokkouTeijiEnd = '';
+      chokkouActualShukkin = ''; chokkouActualTaikin = '';
+      return Promise.resolve();
+    }
     return fetch(GAS_URL + '?mode=getActualPunch&token=' + encodeURIComponent(idToken) + dairiParam() +
-      '&date=' + encodeURIComponent(dateStr) + '&dakokuType=' + encodeURIComponent('出勤'))
+      '&date=' + encodeURIComponent(dateStr) + '&dakokuType=' + encodeURIComponent('出勤,退勤'))
       .then((r) => r.json())
       .then((data) => {
         chokkouTeijiStart = (data.success && data.teijiStart) ? data.teijiStart : '';
         chokkouTeijiEnd   = (data.success && data.teijiEnd)   ? data.teijiEnd   : '';
+        chokkouActualShukkin = (data.success && data.times && data.times['出勤']) ? data.times['出勤'] : '';
+        chokkouActualTaikin  = (data.success && data.times && data.times['退勤']) ? data.times['退勤'] : '';
       })
-      .catch(() => { chokkouTeijiStart = ''; chokkouTeijiEnd = ''; });
+      .catch(() => {
+        chokkouTeijiStart = ''; chokkouTeijiEnd = '';
+        chokkouActualShukkin = ''; chokkouActualTaikin = '';
+      });
   }
   function updateChokkouKyukeiVisibility() {
     const startVal = document.getElementById('chokkouStartDate').value;
@@ -1715,12 +1731,13 @@
     if (!startVal || !idToken) {
       hiruArea.classList.add('hidden'); gogoArea.classList.add('hidden'); chokkouGaishutsuPairs = [];
       chokkouTeijiStart = ''; chokkouTeijiEnd = '';
+      chokkouActualShukkin = ''; chokkouActualTaikin = '';
       updateChokkouDurationPreview();
       return;
     }
     const startStr = startVal.replace(/-/g, '/');
     const endStr   = endVal.replace(/-/g, '/');
-    fetchChokkouTeiji_(startStr).then(updateChokkouDurationPreview); // checkWorkdayと並行して開始
+    fetchChokkouContext_(startStr).then(updateChokkouDurationPreview); // checkWorkdayと並行して開始
     fetch(GAS_URL + '?mode=checkWorkday&token=' + encodeURIComponent(idToken) +
       '&date=' + encodeURIComponent(startStr) + '&endDate=' + encodeURIComponent(endStr))
       .then((r) => r.json())
@@ -1757,9 +1774,35 @@
   function updateChokkouDurationPreview() {
     const el = document.getElementById('chokkouDurationPreview');
     const isHolidayWork = !document.getElementById('chokkouHiruKyukeiArea').classList.contains('hidden');
-    const start = document.getElementById('chokkouShukkinTime').value;
-    const end   = document.getElementById('chokkouTaikinTime').value;
-    if (!start || !end) { el.classList.add('hidden'); return; }
+    const shinsei = getRadioValue('chokkouShinsei');
+    const shukkinInput = document.getElementById('chokkouShukkinTime').value;
+    const taikinInput  = document.getElementById('chokkouTaikinTime').value;
+    // 2026-10-29修正：直行のみ／直帰のみでは、表示されていない方の時刻欄が前回入力時の値を
+    // 保持したまま隠れているだけで出張届の対象外。その値をそのまま使うと誤った実績が
+    // 表示される不具合があった（ユーザー指摘：「直帰のみ」なのに出勤側の古い値が使われていた）。
+    // 直帰のみ＝実際の出勤打刻、直行のみ＝実際の退勤打刻を基準にする
+    // （writeChokkouChokkiPunches_がその側の打刻を一切生成しないのと同じ考え方）
+    let start, end;
+    if (shinsei === '直行・直帰') { start = shukkinInput; end = taikinInput; }
+    else if (shinsei === '直帰のみ') { start = chokkouActualShukkin; end = taikinInput; }
+    else if (shinsei === '直行のみ') { start = shukkinInput; end = chokkouActualTaikin; }
+    else { start = ''; end = ''; }
+    if (!start || !end) {
+      // 直行のみ／直帰のみで、実際の打刻がまだ無いために計算できない場合だけ案内を出す
+      // （種別未選択・時刻未入力の通常ケースでは何も表示しない）
+      if (shinsei === '直帰のみ' && taikinInput && !chokkouActualShukkin) {
+        el.classList.remove('hidden');
+        el.innerHTML = '<span class="hint">まだ出勤の打刻が確認できないため、実績はまだ表示できません。</span>';
+        return;
+      }
+      if (shinsei === '直行のみ' && shukkinInput && !chokkouActualTaikin) {
+        el.classList.remove('hidden');
+        el.innerHTML = '<span class="hint">まだ退勤の打刻が確認できないため、実績はまだ表示できません。</span>';
+        return;
+      }
+      el.classList.add('hidden');
+      return;
+    }
     let rawSpan = hhmmToMinJs(end) - hhmmToMinJs(start);
     if (rawSpan <= 0) rawSpan += 24 * 60;
 
