@@ -1814,14 +1814,21 @@
       deductionParts = deduction.parts;
       total = Math.max(0, Math.round(rawSpan - kyukeiMin));
     } else {
-      // 2026-10-29新設：平日は休日のような休憩質問自体が無いため（定時の昼休憩は実働時間の
-      // 計算上すでに定時内実働〈teijiWorkMin〉に織り込まれている）、GAS側
-      // calcDailyZangyouMinMap_の平日分岐と同じ「出勤〜退勤の実働 − 定時内実働」で計算する。
-      // 定時が取得できていない間（対象日選択直後等）はプレビューを出さない
+      // 2026-10-29新設：平日は休日のような休憩質問自体が無いため、GAS側
+      // calcDailyZangyouMinMap_の平日分岐（zangyouMin = dLog.shuukeiMin - teijiWorkMin）と
+      // 同じ計算にする。定時が取得できていない間（対象日選択直後等）はプレビューを出さない
+      // 【2026-10-29修正】当初rawSpanをそのままteijiWorkMinから引いていたが誤りだった。
+      // dLog.shuukeiMin（buildDakokuMap、集計.gs）は実働の生の経過時間ではなく、退勤時刻基準の
+      // 一律休憩控除（calcKyukeiKojo）を既に引いた値。teijiWorkMin側も定時終業基準で同じ控除を
+      // 引いているため、rawSpanにも同じ控除を適用しないと二重にズレる（ユーザー実機確認で
+      // 発覚：定時17:30・退勤19:00のはずが実績2時間30分と表示され、正しくは1時間30分だった）
       if (!chokkouTeijiStart || !chokkouTeijiEnd) { el.classList.add('hidden'); return; }
-      const teijiWorkMin = hhmmToMinJs(chokkouTeijiEnd) - hhmmToMinJs(chokkouTeijiStart) - calcKyukeiKojoJs_(hhmmToMinJs(chokkouTeijiEnd));
+      const teijiStartMin = hhmmToMinJs(chokkouTeijiStart);
+      const teijiEndMin   = hhmmToMinJs(chokkouTeijiEnd);
+      const teijiWorkMin  = teijiEndMin - teijiStartMin - calcKyukeiKojoJs_(teijiEndMin);
+      const actualWorkMin = Math.max(0, rawSpan - calcKyukeiKojoJs_(hhmmToMinJs(end)));
       kyukeiMin = 0;
-      total = Math.max(0, Math.round(rawSpan - teijiWorkMin));
+      total = Math.max(0, Math.round(actualWorkMin - teijiWorkMin));
     }
 
     // 2026-10-28追加：休日出勤の最終合計はGAS側（buildDakokuMap、集計.gs）で15分単位に
